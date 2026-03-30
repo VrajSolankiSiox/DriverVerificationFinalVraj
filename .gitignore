@@ -1,0 +1,14 @@
+.next
+node_modules
+coverage
+.env
+.env.local
+playwright-report
+blob-report
+test-results
+storage/uploads/*
+storage/exports/*
+!storage/uploads/.gitkeep
+!storage/exports/.gitkeep
+.env
+.DS_Store
