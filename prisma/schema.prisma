@@ -3,9 +3,385 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  accounts     Account[]
+  sessions     Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Hotel {
+  id               String            @id @default(cuid())
+  name             String
+  brand            String?
+  addressLine1     String
+  addressLine2     String?
+  city             String
+  state            String?
+  country          String
+  websiteUrl       String?
+  bookingUrl       String?
+  phone            String?
+  email            String?
+  roomCount        Int?
+  starLevel        Decimal?          @db.Decimal(3, 1)
+  ownershipNotes   String?
+  managementNotes  String?
+  createdById      String
+  updatedById      String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  subjectCompSets  CompSet[]
+  compMemberships  CompSetMember[]
+  rateObservations RateObservation[]
+  reports          Report[]
+  reviewSnapshots  ReviewSnapshot[]
+  uploadBatches    UploadBatch[]
+  websiteSnapshots WebsiteSnapshot[]
+
+  @@index([name])
+  @@index([city, country])
+}
+
+model CompSet {
+  id             String          @id @default(cuid())
+  name           String
+  subjectHotelId String
+  version        Int             @default(1)
+  notes          String?
+  isActive       Boolean         @default(true)
+  createdById    String
+  updatedById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  subjectHotel   Hotel           @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
+  members        CompSetMember[]
+  reports        Report[]
+  uploadBatches  UploadBatch[]
+
+  @@index([subjectHotelId])
+  @@index([isActive])
+}
+
+model CompSetMember {
+  id           String        @id @default(cuid())
+  compSetId    String
+  hotelId      String
+  roleType     HotelRoleType
+  displayOrder Int           @default(0)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  compSet      CompSet       @relation(fields: [compSetId], references: [id], onDelete: Cascade)
+  hotel        Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([compSetId, hotelId])
+  @@index([compSetId, displayOrder])
+}
+
+model UploadMappingTemplate {
+  id                String    @id @default(cuid())
+  organizationKey   String    @default("rank-me-now")
+  sourceName        String
+  name              String
+  mappingJson       Json
+  normalizationJson Json?
+  createdById       String
+  updatedById       String
+  lastUsedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([organizationKey, sourceName])
+}
+
+model UploadBatch {
+  id                   String            @id @default(cuid())
+  sourceName           String
+  fileName             String
+  fileType             String
+  fileSizeBytes        Int
+  storagePath          String
+  subjectHotelId       String
+  compSetId            String
+  status               UploadStatus      @default(DRAFT)
+  importMode           ImportMode        @default(APPEND_NEW)
+  workbookMetaJson     Json?
+  selectedSheet        String?
+  mappingJson          Json?
+  previewJson          Json?
+  validationJson       Json?
+  summaryJson          Json?
+  originalMetadataJson Json?
+  createdById          String
+  updatedById          String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  observations         RateObservation[]
+  compSet              CompSet           @relation(fields: [compSetId], references: [id], onDelete: Cascade)
+  subjectHotel         Hotel             @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
+
+  @@index([subjectHotelId])
+  @@index([compSetId])
+  @@index([status])
+}
+
+model RateObservation {
+  id                 String       @id @default(cuid())
+  hotelId            String
+  uploadBatchId      String?
+  stayDate           DateTime
+  captureDate        DateTime
+  roomType           String?
+  ratePlan           String?
+  refundableFlag     Boolean?
+  nightlyRate        Decimal      @db.Decimal(10, 2)
+  currency           String
+  availabilityStatus String?
+  sourceHotelName    String?
+  sourceHotelCode    String?
+  uniqueKey          String       @unique
+  createdById        String
+  updatedById        String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  hotel              Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  uploadBatch        UploadBatch? @relation(fields: [uploadBatchId], references: [id])
+
+  @@index([hotelId, stayDate])
+  @@index([captureDate])
+}
+
+model WebsiteSnapshot {
+  id                       String                @id @default(cuid())
+  hotelId                  String
+  baseUrl                  String
+  status                   SnapshotStatus        @default(PENDING)
+  scoreTotal               Int?
+  directBookingUxScore     Int?
+  contentCompletenessScore Int?
+  technicalHygieneScore    Int?
+  offerVisibilityScore     Int?
+  trustContactScore        Int?
+  seoScoreTotal            Int?
+  seoFindingsJson          Json?
+  summaryJson              Json?
+  rawFindingsJson          Json?
+  startedAt                DateTime              @default(now())
+  completedAt              DateTime?
+  createdById              String
+  updatedById              String
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  pages                    WebsitePageSnapshot[]
+  hotel                    Hotel                 @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, createdAt])
+}
+
+model WebsitePageSnapshot {
+  id                     String          @id @default(cuid())
+  snapshotId             String
+  url                    String
+  pageType               String?
+  crawlDepth             Int             @default(0)
+  title                  String?
+  metaDescription        String?
+  h1Count                Int?
+  canonical              String?
+  robotsMeta             String?
+  bookingCtaDetected     Boolean?
+  bookingCtaCount        Int?
+  bookingEngineDetected  Boolean?
+  phoneDetected          Boolean?
+  emailDetected          Boolean?
+  addressDetected        Boolean?
+  faqDetected            Boolean?
+  structuredDataDetected Boolean?
+  sitemapReference       Boolean?
+  imageCount             Int?
+  imageAltCoverage       Float?
+  internalLinksJson      Json?
+  extractedJson          Json?
+  rawHtml                String?
+  seoScore               Int?
+  h2Count                Int?
+  h3Count                Int?
+  wordCount              Int?
+  keywordDensityJson     Json?
+  ogTagsJson             Json?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  snapshot               WebsiteSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, crawlDepth])
+}
+
+model ReviewSnapshot {
+  id               String       @id @default(cuid())
+  hotelId          String
+  source           ReviewSource
+  averageRating    Decimal?     @db.Decimal(3, 2)
+  reviewCount      Int?
+  sentimentSummary String?
+  rawJson          Json?
+  capturedAt       DateTime     @default(now())
+  createdById      String
+  updatedById      String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  hotel            Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, source, capturedAt])
+}
+
+model AlertRule {
+  id          String      @id @default(cuid())
+  reportId    String?
+  hotelId     String?
+  metric      AlertMetric
+  threshold   String
+  enabled     Boolean     @default(true)
+  createdById String
+  updatedById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Alert {
+  id               String        @id @default(cuid())
+  alertRuleId      String?
+  reportId         String?
+  hotelId          String?
+  metric           AlertMetric
+  message          String
+  severity         AlertSeverity @default(WARNING)
+  firedAt          DateTime      @default(now())
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+}
+
+model Report {
+  id                     String           @id @default(cuid())
+  name                   String
+  subjectHotelId         String
+  compSetId              String
+  compSetVersion         Int
+  status                 ReportStatus     @default(DRAFT)
+  confidenceLevel        ConfidenceLevel?
+  executiveSummary       String?
+  manualOpportunityNotes String?
+  methodologyNote        String?
+  analysisJson           Json?
+  compSnapshotJson       Json?
+  presentationConfigJson Json?
+  approvedAt             DateTime?
+  approvedById           String?
+  createdById            String
+  updatedById            String
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  exports                ExportArtifact[]
+  compSet                CompSet          @relation(fields: [compSetId], references: [id], onDelete: Cascade)
+  subjectHotel           Hotel            @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
+  sections               ReportSection[]
+
+  @@index([subjectHotelId, createdAt])
+  @@index([status])
+}
+
+model ReportSection {
+  id           String            @id @default(cuid())
+  reportId     String
+  type         ReportSectionType
+  title        String
+  displayOrder Int
+  visibility   SectionVisibility @default(CLIENT_SAFE)
+  enabled      Boolean           @default(true)
+  contentJson  Json
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  report       Report            @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, type])
+  @@index([reportId, displayOrder])
+}
+
+model ExportArtifact {
+  id           String           @id @default(cuid())
+  reportId     String
+  type         ExportType
+  visibility   ExportVisibility
+  status       ExportStatus     @default(PENDING)
+  storagePath  String?
+  fileName     String?
+  errorMessage String?
+  generatedAt  DateTime?
+  createdById  String
+  updatedById  String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  report       Report           @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, generatedAt])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  entityType String
+  entityId   String
+  action     String
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
 }
 
 enum UserRole {
@@ -110,383 +486,4 @@ enum ConfidenceLevel {
   LOW
   MODERATE
   HIGH
-}
-
-model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  passwordHash  String
-  role          UserRole
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model Hotel {
-  id                 String              @id @default(cuid())
-  name               String      
-  brand              String?
-  addressLine1       String
-  addressLine2       String?
-  city               String
-  state              String?
-  country            String
-  websiteUrl         String?
-  bookingUrl         String?
-  expediaUrl         String?
-  phone              String?
-  email              String?
-  roomCount          Int?
-  starLevel          Decimal?            @db.Decimal(3, 1)
-  ownershipNotes     String?
-  managementNotes    String?
-  createdById        String
-  updatedById        String
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  subjectCompSets    CompSet[]
-  compMemberships    CompSetMember[]
-  rateObservations   RateObservation[]
-  websiteSnapshots   WebsiteSnapshot[]
-  reviewSnapshots    ReviewSnapshot[]
-  reports            Report[]
-  uploadBatches      UploadBatch[]
-
-  @@unique([name])
-  @@index([name])
-  @@index([city, country])
-}
-
-model CompSet {
-  id               String          @id @default(cuid())
-  name             String
-  subjectHotelId   String
-  version          Int             @default(1)
-  notes            String?
-  expediaUrl       String?
-  isActive         Boolean         @default(true)
-  createdById      String
-  updatedById      String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  subjectHotel     Hotel           @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
-  members          CompSetMember[]
-  uploadBatches    UploadBatch[]
-  reports          Report[]
-
-  @@index([subjectHotelId])
-  @@index([isActive])
-}
-
-model CompSetMember {
-  id           String        @id @default(cuid())
-  compSetId    String
-  hotelId      String
-  roleType     HotelRoleType
-  displayOrder Int           @default(0)
-  notes        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  compSet      CompSet       @relation(fields: [compSetId], references: [id], onDelete: Cascade)
-  hotel        Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-
-  @@unique([compSetId, hotelId])
-  @@index([compSetId, displayOrder])
-}
-
-model UploadMappingTemplate {
-  id                String   @id @default(cuid())
-  organizationKey   String   @default("rank-me-now")
-  sourceName        String
-  name              String
-  mappingJson       Json
-  normalizationJson Json?
-  createdById       String
-  updatedById       String
-  lastUsedAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([organizationKey, sourceName])
-}
-
-model UploadBatch {
-  id                   String         @id @default(cuid())
-  sourceName           String
-  fileName             String
-  fileType             String
-  fileSizeBytes        Int
-  storagePath          String
-  subjectHotelId       String
-  compSetId            String
-  status               UploadStatus   @default(DRAFT)
-  importMode           ImportMode     @default(APPEND_NEW)
-  workbookMetaJson     Json?
-  selectedSheet        String?
-  mappingJson          Json?
-  previewJson          Json?
-  validationJson       Json?
-  summaryJson          Json?
-  originalMetadataJson Json?
-  createdById          String
-  updatedById          String
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  subjectHotel         Hotel          @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
-  compSet              CompSet        @relation(fields: [compSetId], references: [id], onDelete: Cascade)
-  observations         RateObservation[]
-
-  @@index([subjectHotelId])
-  @@index([compSetId])
-  @@index([status])
-}
-
-model RateObservation {
-  id                 String      @id @default(cuid())
-  hotelId            String
-  uploadBatchId      String?
-  stayDate           DateTime
-  captureDate        DateTime
-  roomType           String?
-  ratePlan           String?
-  refundableFlag     Boolean?
-  nightlyRate        Decimal     @db.Decimal(10, 2)
-  currency           String
-  availabilityStatus String?
-  sourceHotelName    String?
-  sourceHotelCode    String?
-  uniqueKey          String      @unique
-  createdById        String
-  updatedById        String
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  hotel              Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  uploadBatch        UploadBatch? @relation(fields: [uploadBatchId], references: [id], onDelete: SetNull)
-
-  @@index([hotelId, stayDate])
-  @@index([captureDate])
-}
-
-model WebsiteSnapshot {
-  id                        String         @id @default(cuid())
-  hotelId                   String
-  baseUrl                   String
-  status                    SnapshotStatus @default(PENDING)
-  scoreTotal                Int?
-  directBookingUxScore      Int?
-  contentCompletenessScore  Int?
-  technicalHygieneScore     Int?
-  offerVisibilityScore      Int?
-  trustContactScore         Int?
-  seoScoreTotal             Int?
-  seoFindingsJson           Json?
-  summaryJson               Json?
-  rawFindingsJson           Json?
-  startedAt                 DateTime       @default(now())
-  completedAt               DateTime?
-  createdById               String
-  updatedById               String
-  createdAt                 DateTime       @default(now())
-  updatedAt                 DateTime       @updatedAt
-  hotel                     Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  pages                     WebsitePageSnapshot[]
-
-  @@index([hotelId, createdAt])
-}
-
-model WebsitePageSnapshot {
-  id                     String          @id @default(cuid())
-  snapshotId             String
-  url                    String
-  pageType               String?
-  crawlDepth             Int             @default(0)
-  title                  String?
-  metaDescription        String?
-  h1Count                Int?
-  canonical              String?
-  robotsMeta             String?
-  bookingCtaDetected     Boolean?
-  bookingCtaCount        Int?
-  bookingEngineDetected  Boolean?
-  phoneDetected          Boolean?
-  emailDetected          Boolean?
-  addressDetected        Boolean?
-  faqDetected            Boolean?
-  structuredDataDetected Boolean?
-  sitemapReference       Boolean?
-  imageCount             Int?
-  imageAltCoverage       Float?
-  internalLinksJson      Json?
-  extractedJson          Json?
-  rawHtml                String?
-  seoScore               Int?
-  h2Count                Int?
-  h3Count                Int?
-  wordCount              Int?
-  keywordDensityJson     Json?
-  ogTagsJson             Json?
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  snapshot               WebsiteSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-
-  @@index([snapshotId, crawlDepth])
-}
-
-model ReviewSnapshot {
-  id               String       @id @default(cuid())
-  hotelId          String
-  source           ReviewSource
-  averageRating    Decimal?     @db.Decimal(3, 2)
-  reviewCount      Int?
-  sentimentSummary String?
-  rawJson          Json?
-  capturedAt       DateTime     @default(now())
-  createdById      String
-  updatedById      String
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  hotel            Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-
-  @@index([hotelId, source, capturedAt])
-}
-
-model AlertRule {
-  id          String      @id @default(cuid())
-  reportId    String?
-  hotelId     String?
-  metric      AlertMetric
-  threshold   String
-  enabled     Boolean     @default(true)
-  createdById String
-  updatedById String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-}
-
-model Alert {
-  id              String        @id @default(cuid())
-  alertRuleId    String?
-  reportId       String?
-  hotelId        String?
-  metric         AlertMetric
-  message        String
-  severity       AlertSeverity @default(WARNING)
-  firedAt        DateTime      @default(now())
-  acknowledgedAt DateTime?
-  acknowledgedById String?
-}
-
-model Report {
-  id                     String           @id @default(cuid())
-  name                   String
-  subjectHotelId         String
-  compSetId              String
-  compSetVersion         Int
-  status                 ReportStatus     @default(DRAFT)
-  confidenceLevel        ConfidenceLevel?
-  executiveSummary       String?
-  manualOpportunityNotes String?
-  methodologyNote        String?
-  analysisJson           Json?
-  compSnapshotJson       Json?
-  presentationConfigJson Json?
-  approvedAt             DateTime?
-  approvedById           String?
-  createdById            String
-  updatedById            String
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-  subjectHotel           Hotel            @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
-  compSet                CompSet          @relation(fields: [compSetId], references: [id], onDelete: Cascade)
-  sections               ReportSection[]
-  exports                ExportArtifact[]
-
-  @@index([subjectHotelId, createdAt])
-  @@index([status])
-}
-
-model ReportSection {
-  id          String            @id @default(cuid())
-  reportId    String
-  type        ReportSectionType
-  title       String
-  displayOrder Int
-  visibility  SectionVisibility @default(CLIENT_SAFE)
-  enabled     Boolean           @default(true)
-  contentJson Json
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  report      Report            @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  @@unique([reportId, type])
-  @@index([reportId, displayOrder])
-}
-
-model ExportArtifact {
-  id           String           @id @default(cuid())
-  reportId     String
-  type         ExportType
-  visibility   ExportVisibility
-  status       ExportStatus     @default(PENDING)
-  storagePath  String?
-  fileName     String?
-  errorMessage String?
-  generatedAt  DateTime?
-  createdById  String
-  updatedById  String
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  report       Report           @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  @@index([reportId, generatedAt])
-}
-
-model ActivityLog {
-  id         String   @id @default(cuid())
-  actorId    String?
-  entityType String
-  entityId   String
-  action     String
-  message    String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-
-  @@index([entityType, entityId, createdAt])
 }
