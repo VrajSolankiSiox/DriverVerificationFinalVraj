@@ -65,6 +65,7 @@ model Hotel {
   country          String
   websiteUrl       String?
   bookingUrl       String?
+  expediaUrl       String?
   phone            String?
   email            String?
   roomCount        Int?
@@ -94,6 +95,7 @@ model CompSet {
   version        Int             @default(1)
   notes          String?
   isActive       Boolean         @default(true)
+  expediaUrl     String?
   createdById    String
   updatedById    String
   createdAt      DateTime        @default(now())
