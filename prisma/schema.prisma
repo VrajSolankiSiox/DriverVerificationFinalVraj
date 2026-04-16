@@ -84,6 +84,7 @@ model Hotel {
   uploadBatches    UploadBatch[]
   websiteSnapshots WebsiteSnapshot[]
 
+  @@unique([name])
   @@index([name])
   @@index([city, country])
 }

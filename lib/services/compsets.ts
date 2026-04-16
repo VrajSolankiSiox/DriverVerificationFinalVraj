@@ -58,6 +58,11 @@ export async function createCompSet(
       hotel = await prisma.hotel.create({
         data: {
           name: hotelData.hotelName,
+          // CompSets only collect a name/link today; fill required address fields
+          // with placeholders so the record can be created and later edited.
+          addressLine1: "Unknown",
+          city: "Unknown",
+          country: "Unknown",
           expediaUrl: hotelData.expediaLink || null,
           createdById: actorId,
           updatedById: actorId,
