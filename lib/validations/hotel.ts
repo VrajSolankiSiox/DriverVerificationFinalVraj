@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const hotelSchema = z.object({
-  name: z.string().min(2),
+  name: z.string().trim().min(2),
   brand: z.string().optional().nullable(),
   addressLine1: z.string().min(3),
   addressLine2: z.string().optional().nullable(),

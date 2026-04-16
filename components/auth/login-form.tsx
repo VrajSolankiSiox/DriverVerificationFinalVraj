@@ -32,18 +32,35 @@ export function LoginForm() {
             const password = String(formData.get("password") ?? "");
             setError(null);
             startTransition(async () => {
-              const result = await signIn("credentials", {
-                email,
-                password,
-                redirect: false,
-                callbackUrl,
-              });
-              if (result?.error) {
-                setError("Invalid credentials or temporary lockout.");
-                return;
+              try {
+                const result = await signIn("credentials", {
+                  email,
+                  password,
+                  redirect: false,
+                  callbackUrl,
+                });
+
+                if (!result) {
+                  setError("Sign in failed (no response). Check server logs.");
+                  return;
+                }
+
+                if (result.error) {
+                  setError("Invalid credentials or temporary lockout.");
+                  return;
+                }
+
+                if (!result.ok) {
+                  setError("Sign in failed. Check server logs.");
+                  return;
+                }
+
+                router.push(result.url ?? callbackUrl);
+                router.refresh();
+              } catch (err) {
+                console.error("signIn() failed", err);
+                setError("Sign in failed (network/server error).");
               }
-              router.push(callbackUrl);
-              router.refresh();
             });
           }}
         >

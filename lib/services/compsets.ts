@@ -38,44 +38,59 @@ export async function getCompSet(id: string) {
 export async function createCompSet(
   input: {
     name: string;
-    subjectHotelId: string;
-    version?: number;
-    notes?: string | null;
-    memberHotelIds: string[];
+    expediaUrl?: string;
+    hotels: Array<{
+      hotelName: string;
+      expediaLink?: string;
+    }>;
   },
   actorId: string,
 ) {
-  const parsed = compsetSchema.parse({
-    ...input,
-    version: input.version ?? 1,
+  const parsed = compsetSchema.parse(input);
+
+  // Create hotels if they don't exist, or find existing ones
+  const hotelPromises = parsed.hotels.map(async (hotelData, index) => {
+    let hotel = await prisma.hotel.findFirst({
+      where: { name: hotelData.hotelName },
+    });
+
+    if (!hotel) {
+      hotel = await prisma.hotel.create({
+        data: {
+          name: hotelData.hotelName,
+          expediaUrl: hotelData.expediaLink || null,
+          createdById: actorId,
+          updatedById: actorId,
+        },
+      });
+    }
+
+    return {
+      hotel,
+      roleType: index === 0 ? HotelRoleType.SUBJECT : HotelRoleType.COMP,
+      displayOrder: index,
+    };
   });
 
-  const uniqueIds = [...new Set(parsed.memberHotelIds)];
-  if (uniqueIds.includes(parsed.subjectHotelId)) {
-    throw new Error("Subject hotel should not be duplicated in comp members.");
-  }
+  const hotelResults = await Promise.all(hotelPromises);
+
+  // Use the first hotel as the subject
+  const subjectHotel = hotelResults[0].hotel;
 
   const created = await prisma.compSet.create({
     data: {
       name: parsed.name,
-      subjectHotelId: parsed.subjectHotelId,
-      version: parsed.version,
-      notes: parsed.notes || null,
+      expediaUrl: parsed.expediaUrl || null,
+      subjectHotelId: subjectHotel.id,
+      version: 1,
       createdById: actorId,
       updatedById: actorId,
       members: {
-        create: [
-          {
-            hotelId: parsed.subjectHotelId,
-            roleType: HotelRoleType.SUBJECT,
-            displayOrder: 0,
-          },
-          ...uniqueIds.map((hotelId, index) => ({
-            hotelId,
-            roleType: HotelRoleType.COMP,
-            displayOrder: index + 1,
-          })),
-        ],
+        create: hotelResults.map(({ hotel, roleType, displayOrder }) => ({
+          hotelId: hotel.id,
+          roleType,
+          displayOrder,
+        })),
       },
     },
     include: {

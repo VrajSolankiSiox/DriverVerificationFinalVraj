@@ -14,6 +14,21 @@ import {
 } from "@/lib/security/login-rate-limit";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NEXTAUTH_DEBUG === "true",
+  logger: {
+    error(code, metadata) {
+      console.error("[NextAuth][error]", code, metadata);
+    },
+    warn(code) {
+      console.warn("[NextAuth][warn]", code);
+    },
+    debug(code, metadata) {
+      if (process.env.NEXTAUTH_DEBUG === "true") {
+        console.debug("[NextAuth][debug]", code, metadata);
+      }
+    },
+  },
   session: {
     strategy: "jwt",
   },

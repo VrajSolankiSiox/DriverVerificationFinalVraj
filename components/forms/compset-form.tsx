@@ -1,38 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { compsetSchema } from "@/lib/validations/compset";
 
-export function CompSetForm({
-  hotels,
-}: {
-  hotels: Array<{ id: string; name: string }>;
-}) {
+export function CompSetForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+
   const form = useForm({
     resolver: zodResolver(compsetSchema),
     defaultValues: {
       name: "",
-      subjectHotelId: hotels[0]?.id ?? "",
-      version: 1,
-      notes: "",
-      memberHotelIds: [] as string[],
+      expediaUrl: "",
+      hotels: [{ hotelName: "", expediaLink: "" }],
     },
   });
 
-  const selectedSubject = form.watch("subjectHotelId");
-  const selectedMembers = form.watch("memberHotelIds") ?? [];
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "hotels",
+  });
+
+  const addHotel = () => {
+    if (fields.length < 10) {
+      append({ hotelName: "", expediaLink: "" });
+    }
+  };
+
+  const removeHotel = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
+    }
+  };
 
   return (
     <form
@@ -54,49 +61,108 @@ export function CompSetForm({
       })}
     >
       <div className="space-y-2">
-        <Label htmlFor="name">CompSet name</Label>
-        <Input id="name" {...form.register("name")} />
+        <Label htmlFor="name">Compset Name</Label>
+        <Input
+          id="name"
+          {...form.register("name")}
+          placeholder="Enter compset name"
+        />
+        {form.formState.errors.name && (
+          <p className="text-sm text-destructive">
+            {form.formState.errors.name.message}
+          </p>
+        )}
       </div>
+
       <div className="space-y-2">
-        <Label htmlFor="subjectHotelId">Subject hotel</Label>
-        <Select id="subjectHotelId" {...form.register("subjectHotelId")}>
-          {hotels.map((hotel) => (
-            <option key={hotel.id} value={hotel.id}>
-              {hotel.name}
-            </option>
-          ))}
-        </Select>
+        <Label htmlFor="expediaUrl">Expedia URL (for OTA data fetching)</Label>
+        <Input
+          id="expediaUrl"
+          {...form.register("expediaUrl")}
+          placeholder="https://www.expedia.com/..."
+          type="url"
+        />
+        {form.formState.errors.expediaUrl && (
+          <p className="text-sm text-destructive">
+            {form.formState.errors.expediaUrl.message}
+          </p>
+        )}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" {...form.register("notes")} />
-      </div>
-      <div className="space-y-3">
-        <Label>Comp members</Label>
-        <div className="grid gap-2 md:grid-cols-2">
-          {hotels
-            .filter((hotel) => hotel.id !== selectedSubject)
-            .map((hotel) => {
-              const checked = selectedMembers.includes(hotel.id);
-              return (
-                <label key={hotel.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <Checkbox
-                    checked={checked}
-                    onChange={(event) => {
-                      const next = event.target.checked
-                        ? [...selectedMembers, hotel.id]
-                        : selectedMembers.filter((value) => value !== hotel.id);
-                      form.setValue("memberHotelIds", next, { shouldValidate: true });
-                    }}
-                  />
-                  <span className="text-sm">{hotel.name}</span>
-                </label>
-              );
-            })}
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label>Hotels ({fields.length}/10)</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addHotel}
+            disabled={fields.length >= 10}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Hotel
+          </Button>
         </div>
+
+        <div className="space-y-3">
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex gap-3 items-end">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor={`hotels.${index}.hotelName`}>Hotel Name</Label>
+                <Input
+                  id={`hotels.${index}.hotelName`}
+                  {...form.register(`hotels.${index}.hotelName`)}
+                  placeholder="Enter hotel name"
+                />
+                {form.formState.errors.hotels?.[index]?.hotelName && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.hotels[index]?.hotelName?.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <Label htmlFor={`hotels.${index}.expediaLink`}>
+                  Expedia Link
+                </Label>
+                <Input
+                  id={`hotels.${index}.expediaLink`}
+                  {...form.register(`hotels.${index}.expediaLink`)}
+                  placeholder="https://www.expedia.com/..."
+                  type="url"
+                />
+                {form.formState.errors.hotels?.[index]?.expediaLink && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.hotels[index]?.expediaLink?.message}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => removeHotel(index)}
+                disabled={fields.length <= 1}
+                className="mb-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {form.formState.errors.hotels &&
+          typeof form.formState.errors.hotels.message === "string" && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.hotels.message}
+            </p>
+          )}
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit">Create compset</Button>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Button type="submit">Create Compset</Button>
     </form>
   );
 }

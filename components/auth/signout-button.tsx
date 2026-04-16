@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 
 export function SignOutButton() {
   return (
-    <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
+    <button
+      className="bg-red-600 py-1 px-2 text-white rounded-md hover:bg-white hover:text-black border transition"
+      onClick={() => signOut({ callbackUrl: "/login" })}
+    >
       Sign out
-    </Button>
+    </button>
   );
 }

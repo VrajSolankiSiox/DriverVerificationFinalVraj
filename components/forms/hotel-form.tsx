@@ -4,16 +4,23 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { hotelSchema, type HotelInput } from "@/lib/validations/hotel";
 
-export function HotelForm({ defaultValues, hotelId }: { defaultValues?: Partial<HotelInput>; hotelId?: string }) {
+export function HotelForm({
+  defaultValues,
+  hotelId,
+}: {
+  defaultValues?: Partial<HotelInput>;
+  hotelId?: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  console.log(error);
   const form = useForm<HotelInput>({
     resolver: zodResolver(hotelSchema),
     defaultValues: {
@@ -40,13 +47,17 @@ export function HotelForm({ defaultValues, hotelId }: { defaultValues?: Partial<
       className="grid gap-4 md:grid-cols-2"
       onSubmit={form.handleSubmit(async (values) => {
         setError(null);
-        const response = await fetch(hotelId ? `/api/hotels/${hotelId}` : "/api/hotels", {
-          method: hotelId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
-        });
+        const response = await fetch(
+          hotelId ? `/api/hotels/${hotelId}` : "/api/hotels",
+          {
+            method: hotelId ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values),
+          },
+        );
         const result = await response.json();
         if (!response.ok) {
+          toast.error(result.error);
           setError(result.error || "Failed to save hotel.");
           return;
         }
@@ -64,7 +75,11 @@ export function HotelForm({ defaultValues, hotelId }: { defaultValues?: Partial<
       </div>
       <div className="space-y-2">
         <Label htmlFor="roomCount">Room count</Label>
-        <Input id="roomCount" type="number" {...form.register("roomCount", { valueAsNumber: true })} />
+        <Input
+          id="roomCount"
+          type="number"
+          {...form.register("roomCount", { valueAsNumber: true })}
+        />
       </div>
       <div className="space-y-2 md:col-span-2">
         <Label htmlFor="addressLine1">Address</Label>
@@ -84,12 +99,26 @@ export function HotelForm({ defaultValues, hotelId }: { defaultValues?: Partial<
       </div>
       <div className="space-y-2">
         <Label htmlFor="starLevel">Star level</Label>
-        <Input id="starLevel" type="number" step="0.1" {...form.register("starLevel", { valueAsNumber: true })} />
+        <select
+          id="starLevel"
+          defaultValue=""
+          {...form.register("starLevel", { valueAsNumber: true })}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="" disabled>
+            Select rating
+          </option>
+          <option value={1}>⭐</option>
+          <option value={2}>⭐⭐</option>
+          <option value={3}>⭐⭐⭐</option>
+          <option value={4}>⭐⭐⭐⭐</option>
+          <option value={5}>⭐⭐⭐⭐⭐</option>
+        </select>
       </div>
-      <div className="space-y-2 md:col-span-2">
+      {/* <div className="space-y-2 md:col-span-2">
         <Label htmlFor="websiteUrl">Website URL</Label>
         <Input id="websiteUrl" type="url" {...form.register("websiteUrl")} />
-      </div>
+      </div> */}
       <div className="space-y-2 md:col-span-2">
         <Label htmlFor="bookingUrl">Booking URL</Label>
         <Input id="bookingUrl" type="url" {...form.register("bookingUrl")} />
@@ -102,17 +131,21 @@ export function HotelForm({ defaultValues, hotelId }: { defaultValues?: Partial<
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" {...form.register("email")} />
       </div>
-      <div className="space-y-2 md:col-span-2">
+      {/* <div className="space-y-2 md:col-span-2">
         <Label htmlFor="ownershipNotes">Ownership notes</Label>
         <Textarea id="ownershipNotes" {...form.register("ownershipNotes")} />
       </div>
       <div className="space-y-2 md:col-span-2">
         <Label htmlFor="managementNotes">Management notes</Label>
         <Textarea id="managementNotes" {...form.register("managementNotes")} />
-      </div>
-      {error ? <p className="md:col-span-2 text-sm text-destructive">{error}</p> : null}
+      </div> */}
+      {/* {error ? (
+        <p className="md:col-span-2 text-sm text-destructive">{error}</p>
+      ) : null} */}
       <div className="md:col-span-2">
-        <Button type="submit">{hotelId ? "Update hotel" : "Create hotel"}</Button>
+        <Button type="submit">
+          {hotelId ? "Update hotel" : "Create hotel"}
+        </Button>
       </div>
     </form>
   );

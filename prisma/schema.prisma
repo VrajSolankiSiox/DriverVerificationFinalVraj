@@ -160,7 +160,7 @@ model VerificationToken {
 
 model Hotel {
   id                 String              @id @default(cuid())
-  name               String
+  name               String      
   brand              String?
   addressLine1       String
   addressLine2       String?
@@ -169,6 +169,7 @@ model Hotel {
   country            String
   websiteUrl         String?
   bookingUrl         String?
+  expediaUrl         String?
   phone              String?
   email              String?
   roomCount          Int?
@@ -187,6 +188,7 @@ model Hotel {
   reports            Report[]
   uploadBatches      UploadBatch[]
 
+  @@unique([name])
   @@index([name])
   @@index([city, country])
 }
@@ -197,6 +199,7 @@ model CompSet {
   subjectHotelId   String
   version          Int             @default(1)
   notes            String?
+  expediaUrl       String?
   isActive         Boolean         @default(true)
   createdById      String
   updatedById      String

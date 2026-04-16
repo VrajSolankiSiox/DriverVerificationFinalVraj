@@ -18,8 +18,10 @@ export function UploadStartForm({
   const router = useRouter();
   const [subjectHotelId, setSubjectHotelId] = useState(hotels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
-  const filteredCompSets = compsets.filter((compSet) => compSet.subjectHotelId === subjectHotelId);
-
+  const filteredCompSets = compsets.filter(
+    (compSet) => compSet.subjectHotelId === subjectHotelId,
+  );
+  console.log(compsets);
   return (
     <form
       className="space-y-4"
@@ -41,22 +43,40 @@ export function UploadStartForm({
     >
       <div className="space-y-2">
         <Label htmlFor="sourceName">Source name</Label>
-        <Input id="sourceName" name="sourceName" defaultValue="Expedia" required />
+        <Input
+          id="sourceName"
+          name="sourceName"
+          defaultValue="Expedia"
+          required
+        />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="subjectHotelId">Subject hotel</Label>
-        <Select id="subjectHotelId" name="subjectHotelId" value={subjectHotelId} onChange={(event) => setSubjectHotelId(event.target.value)}>
+        <Label htmlFor="subjectHotelId">Main Property</Label>
+        <Select
+          id="subjectHotelId"
+          name="subjectHotelId"
+          value={subjectHotelId}
+          onChange={(event) => setSubjectHotelId(event.target.value)}
+        >
           {hotels.map((hotel) => (
-            <option key={hotel.id} value={hotel.id}>{hotel.name}</option>
+            <option key={hotel.id} value={hotel.id}>
+              {hotel.name}
+            </option>
           ))}
         </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="compSetId">CompSet</Label>
-        <Select id="compSetId" name="compSetId" required>
-          {filteredCompSets.map((compSet) => (
-            <option key={compSet.id} value={compSet.id}>{compSet.name}</option>
-          ))}
+        <Select id="compSetId" name="compSetId" required defaultValue="">
+          {filteredCompSets.length === 0 ? (
+            <option value="">No compset</option>
+          ) : (
+            filteredCompSets.map((compSet) => (
+              <option key={compSet.id} value={compSet.id}>
+                {compSet.name}
+              </option>
+            ))
+          )}
         </Select>
       </div>
       <div className="space-y-2">
@@ -68,7 +88,13 @@ export function UploadStartForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="file">Expedia rate file</Label>
-        <Input id="file" name="file" type="file" accept=".xlsx,.xls,.csv" required />
+        <Input
+          id="file"
+          name="file"
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          required
+        />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit">Upload file</Button>
