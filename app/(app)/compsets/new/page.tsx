@@ -1,7 +1,13 @@
 import { CompSetForm } from "@/components/forms/compset-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
 
-export default function NewCompSetPage() {
+export default async function NewCompSetPage() {
+  const hotels = await prisma.hotel.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -15,7 +21,7 @@ export default function NewCompSetPage() {
           <CardTitle>CompSet setup</CardTitle>
         </CardHeader>
         <CardContent>
-          <CompSetForm />
+          <CompSetForm hotels={hotels} />
         </CardContent>
       </Card>
     </div>

@@ -8,12 +8,13 @@ export const compsetMemberSchema = z.object({
 });
 
 export const compsetHotelRowSchema = z.object({
-  hotelName: z.string().trim().min(1, "Hotel name is required"),
+  hotelId: z.string().min(1, "Hotel is required"),
   expediaLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 export const compsetSchema = z.object({
   name: z.string().trim().min(2, "Compset name must be at least 2 characters"),
   expediaUrl: z.string().url("Must be a valid Expedia URL").optional().or(z.literal("")),
-  hotels: z.array(compsetHotelRowSchema).min(1, "At least one hotel is required").max(10, "Maximum 10 hotels allowed"),
+  subjectHotelId: z.string().min(1, "Subject hotel is required"),
+  compHotels: z.array(compsetHotelRowSchema).min(1, "At least one comp hotel is required").max(10, "Maximum 10 comp hotels allowed"),
 });

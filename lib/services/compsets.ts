@@ -39,63 +39,34 @@ export async function createCompSet(
   input: {
     name: string;
     expediaUrl?: string;
-    hotels: Array<{
-      hotelName: string;
-      expediaLink?: string;
-    }>;
+    subjectHotelId: string;
+    compHotels: Array<{ hotelId: string; expediaLink?: string }>;
   },
   actorId: string,
 ) {
   const parsed = compsetSchema.parse(input);
 
-  // Create hotels if they don't exist, or find existing ones
-  const hotelPromises = parsed.hotels.map(async (hotelData, index) => {
-    let hotel = await prisma.hotel.findFirst({
-      where: { name: hotelData.hotelName },
-    });
-
-    if (!hotel) {
-      hotel = await prisma.hotel.create({
-        data: {
-          name: hotelData.hotelName,
-          // CompSets only collect a name/link today; fill required address fields
-          // with placeholders so the record can be created and later edited.
-          addressLine1: "Unknown",
-          city: "Unknown",
-          country: "Unknown",
-          expediaUrl: hotelData.expediaLink || null,
-          createdById: actorId,
-          updatedById: actorId,
-        },
-      });
-    }
-
-    return {
-      hotel,
-      roleType: index === 0 ? HotelRoleType.SUBJECT : HotelRoleType.COMP,
-      displayOrder: index,
-    };
-  });
-
-  const hotelResults = await Promise.all(hotelPromises);
-
-  // Use the first hotel as the subject
-  const subjectHotel = hotelResults[0].hotel;
-
   const created = await prisma.compSet.create({
     data: {
       name: parsed.name,
       expediaUrl: parsed.expediaUrl || null,
-      subjectHotelId: subjectHotel.id,
+      subjectHotelId: parsed.subjectHotelId,
       version: 1,
       createdById: actorId,
       updatedById: actorId,
       members: {
-        create: hotelResults.map(({ hotel, roleType, displayOrder }) => ({
-          hotelId: hotel.id,
-          roleType,
-          displayOrder,
-        })),
+        create: [
+          {
+            hotelId: parsed.subjectHotelId,
+            roleType: HotelRoleType.SUBJECT,
+            displayOrder: 0,
+          },
+          ...parsed.compHotels.map(({ hotelId }, index) => ({
+            hotelId,
+            roleType: HotelRoleType.COMP,
+            displayOrder: index + 1,
+          })),
+        ],
       },
     },
     include: {
@@ -105,7 +76,24 @@ export async function createCompSet(
     },
   });
 
+  // Update expediaUrl for comp hotels if a link was provided
+  const hotelsToUpdate = parsed.compHotels.filter((c) => c.expediaLink?.trim());
+  if (hotelsToUpdate.length > 0) {
+    await Promise.all(
+      hotelsToUpdate.map((c) =>
+        prisma.hotel.update({
+          where: { id: c.hotelId },
+          data: {
+            expediaUrl: c.expediaLink,
+            updatedById: actorId,
+          },
+        }),
+      ),
+    );
+  }
+
   await logActivity({
+
     actorId,
     entityType: "CompSet",
     entityId: created.id,

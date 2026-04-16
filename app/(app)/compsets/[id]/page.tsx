@@ -30,6 +30,19 @@ export default async function CompSetDetailPage({
         <p className="text-sm text-muted-foreground">
           Subject hotel: {compSet.subjectHotel.name}
         </p>
+        {compSet.expediaUrl && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Expedia:{" "}
+            <a
+              href={compSet.expediaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {compSet.expediaUrl}
+            </a>
+          </p>
+        )}
       </div>
       <Card>
         <CardHeader>
@@ -42,52 +55,35 @@ export default async function CompSetDetailPage({
                 <TableHead>Order</TableHead>
                 <TableHead>Property</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>Expedia Link</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {compSet.members.map((member) => (
                 <TableRow key={member.id}>
-                  <TableCell>{member.displayOrder}</TableCell>
+                  <TableCell>{member.displayOrder + 1}</TableCell>
                   <TableCell>{member.hotel.name}</TableCell>
                   <TableCell>{member.roleType}</TableCell>
-                  <TableCell>{member.notes ?? "—"}</TableCell>
+                  <TableCell>
+                    {member.hotel.expediaUrl ? (
+                      <a
+                        href={member.hotel.expediaUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Link
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent uploads</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {compSet.uploadBatches.map((batch) => (
-                <li key={batch.id}>
-                  <Link href={`/uploads/${batch.id}`}>{batch.fileName}</Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {compSet.reports.map((report) => (
-                <li key={report.id}>
-                  <Link href={`/reports/${report.id}`}>{report.name}</Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
