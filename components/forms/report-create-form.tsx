@@ -62,12 +62,16 @@ export function ReportCreateForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="compSetId">CompSet</Label>
-        <Select id="compSetId" name="compSetId" required>
-          {filteredCompSets.map((compSet) => (
-            <option key={compSet.id} value={compSet.id}>
-              {compSet.name}
-            </option>
-          ))}
+        <Select id="compSetId" name="compSetId" required disabled={filteredCompSets.length === 0}>
+          {filteredCompSets.length > 0 ? (
+            filteredCompSets.map((compSet) => (
+              <option key={compSet.id} value={compSet.id}>
+                {compSet.name}
+              </option>
+            ))
+          ) : (
+            <option value="">No compsets available</option>
+          )}
         </Select>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
