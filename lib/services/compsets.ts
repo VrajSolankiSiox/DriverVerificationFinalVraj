@@ -40,11 +40,40 @@ export async function createCompSet(
     name: string;
     expediaUrl?: string;
     subjectHotelId: string;
-    compHotels: Array<{ hotelId: string; expediaLink?: string }>;
+    compHotels: Array<{ hotelName: string; expediaLink?: string }>;
   },
   actorId: string,
 ) {
   const parsed = compsetSchema.parse(input);
+
+  const resolvedCompHotels: Array<{ hotelId: string }> = [];
+
+  for (const comp of parsed.compHotels) {
+    let dbHotel = await prisma.hotel.findFirst({
+      where: { name: comp.hotelName },
+    });
+
+    if (!dbHotel) {
+      dbHotel = await prisma.hotel.create({
+        data: {
+          name: comp.hotelName,
+          addressLine1: "Unknown",
+          city: "Unknown",
+          country: "Unknown",
+          expediaUrl: comp.expediaLink || null,
+          createdById: actorId,
+          updatedById: actorId,
+        },
+      });
+    } else if (comp.expediaLink?.trim() && comp.expediaLink !== dbHotel.expediaUrl) {
+      dbHotel = await prisma.hotel.update({
+        where: { id: dbHotel.id },
+        data: { expediaUrl: comp.expediaLink, updatedById: actorId },
+      });
+    }
+
+    resolvedCompHotels.push({ hotelId: dbHotel.id });
+  }
 
   const created = await prisma.compSet.create({
     data: {
@@ -61,7 +90,7 @@ export async function createCompSet(
             roleType: HotelRoleType.SUBJECT,
             displayOrder: 0,
           },
-          ...parsed.compHotels.map(({ hotelId }, index) => ({
+          ...resolvedCompHotels.map(({ hotelId }, index) => ({
             hotelId,
             roleType: HotelRoleType.COMP,
             displayOrder: index + 1,
@@ -76,24 +105,7 @@ export async function createCompSet(
     },
   });
 
-  // Update expediaUrl for comp hotels if a link was provided
-  const hotelsToUpdate = parsed.compHotels.filter((c) => c.expediaLink?.trim());
-  if (hotelsToUpdate.length > 0) {
-    await Promise.all(
-      hotelsToUpdate.map((c) =>
-        prisma.hotel.update({
-          where: { id: c.hotelId },
-          data: {
-            expediaUrl: c.expediaLink,
-            updatedById: actorId,
-          },
-        }),
-      ),
-    );
-  }
-
   await logActivity({
-
     actorId,
     entityType: "CompSet",
     entityId: created.id,

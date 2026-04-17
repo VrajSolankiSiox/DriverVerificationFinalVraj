@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ export function CompSetForm({ hotels }: { hotels: { id: string; name: string }[]
       name: "",
       expediaUrl: "",
       subjectHotelId: "",
-      compHotels: [{ hotelId: "", expediaLink: "" }],
+      compHotels: [{ hotelName: "", expediaLink: "" }],
     },
   });
 
@@ -33,7 +33,7 @@ export function CompSetForm({ hotels }: { hotels: { id: string; name: string }[]
 
   const addHotel = () => {
     if (fields.length < 10) {
-      append({ hotelId: "", expediaLink: "" });
+      append({ hotelName: "", expediaLink: "" });
     }
   };
 
@@ -121,27 +121,30 @@ export function CompSetForm({ hotels }: { hotels: { id: string; name: string }[]
           </Button>
         </div>
 
+        <datalist id="competitor-hotels-list">
+          {hotels
+            .filter((hotel) => hotel.id !== selectedSubjectHotelId)
+            .map((hotel) => (
+              <option key={hotel.id} value={hotel.name}>
+                {hotel.name}
+              </option>
+            ))}
+        </datalist>
+
         <div className="space-y-4">
           {fields.map((field, index) => (
             <div key={field.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <div className="space-y-2">
-                <Label htmlFor={`compHotels.${index}.hotelId`}>Competitor {index + 1}</Label>
-                <Select
-                  id={`compHotels.${index}.hotelId`}
-                  {...form.register(`compHotels.${index}.hotelId` as const)}
-                >
-                  <option value="">Select competitive hotel...</option>
-                  {hotels
-                    .filter((hotel) => hotel.id !== selectedSubjectHotelId)
-                    .map((hotel) => (
-                      <option key={hotel.id} value={hotel.id}>
-                        {hotel.name}
-                      </option>
-                    ))}
-                </Select>
-                {form.formState.errors.compHotels?.[index]?.hotelId && (
+                <Label htmlFor={`compHotels.${index}.hotelName`}>Competitor {index + 1}</Label>
+                <Input
+                  id={`compHotels.${index}.hotelName`}
+                  list="competitor-hotels-list"
+                  placeholder="Select or enter hotel name..."
+                  {...form.register(`compHotels.${index}.hotelName` as const)}
+                />
+                {form.formState.errors.compHotels?.[index]?.hotelName && (
                   <p className="text-sm text-destructive">
-                    {form.formState.errors.compHotels[index]?.hotelId?.message}
+                    {form.formState.errors.compHotels[index]?.hotelName?.message}
                   </p>
                 )}
               </div>
@@ -171,7 +174,10 @@ export function CompSetForm({ hotels }: { hotels: { id: string; name: string }[]
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit">Create Compset</Button>
+      <Button type="submit" disabled={form.formState.isSubmitting}>
+        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {form.formState.isSubmitting ? "Creating Compset..." : "Create Compset"}
+      </Button>
     </form>
   );
 }

@@ -8,7 +8,7 @@ export const compsetMemberSchema = z.object({
 });
 
 export const compsetHotelRowSchema = z.object({
-  hotelId: z.string().min(1, "Hotel is required"),
+  hotelName: z.string().min(1, "Hotel name is required"),
   expediaLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 

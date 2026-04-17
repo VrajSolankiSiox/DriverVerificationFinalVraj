@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { HotelActions } from "@/components/hotels/hotel-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getHotel } from "@/lib/services/hotels";
@@ -23,13 +24,7 @@ export default async function HotelDetailPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline"><Link href={`/hotels/${hotel.id}/edit`}>Edit</Link></Button>
-          <form action="/api/website-audits/run" method="post">
-            <input type="hidden" name="hotelId" value={hotel.id} />
-            <Button type="submit">Run website audit</Button>
-          </form>
-          <form action={`/api/hotels/${hotel.id}/reviews`} method="post">
-            <Button type="submit" variant="secondary">Run review snapshot</Button>
-          </form>
+          <HotelActions hotelId={hotel.id} />
         </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-2">

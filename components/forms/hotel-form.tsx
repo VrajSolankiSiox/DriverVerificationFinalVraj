@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,7 +73,29 @@ export function HotelForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="brand">Brand / flag</Label>
-        <Input id="brand" {...form.register("brand")} />
+        <select
+          id="brand"
+          {...form.register("brand")}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">Select brand...</option>
+          <option value="Marriott">Marriott</option>
+          <option value="Hilton">Hilton</option>
+          <option value="IHG">IHG</option>
+          <option value="Hyatt">Hyatt</option>
+          <option value="Wyndham">Wyndham</option>
+          <option value="Choice">Choice</option>
+          <option value="Best Western">Best Western</option>
+          <option value="La Quinta">La Quinta</option>
+          <option value="Hampton">Hampton</option>
+          <option value="Holiday Inn">Holiday Inn</option>
+          <option value="Independent">Independent</option>
+          <option value="G-6">G-6</option>
+          <option value="Sonesta">Sonesta</option>
+          <option value="Red Roof">Red Roof</option>
+          <option value="Radisson">Radisson</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="roomCount">Room count</Label>
@@ -115,10 +139,15 @@ export function HotelForm({
           <option value={5}>⭐⭐⭐⭐⭐</option>
         </select>
       </div>
-      {/* <div className="space-y-2 md:col-span-2">
-        <Label htmlFor="websiteUrl">Website URL</Label>
-        <Input id="websiteUrl" type="url" {...form.register("websiteUrl")} />
-      </div> */}
+      <div className="space-y-2 md:col-span-2">
+        <Label htmlFor="websiteUrl">Website URL (optional)</Label>
+        <Input
+          id="websiteUrl"
+          type="url"
+          placeholder="https://www.example.com"
+          {...form.register("websiteUrl")}
+        />
+      </div>
       <div className="space-y-2 md:col-span-2">
         <Label htmlFor="bookingUrl">Booking URL</Label>
         <Input id="bookingUrl" type="url" {...form.register("bookingUrl")} />
@@ -131,20 +160,16 @@ export function HotelForm({
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" {...form.register("email")} />
       </div>
-      {/* <div className="space-y-2 md:col-span-2">
-        <Label htmlFor="ownershipNotes">Ownership notes</Label>
-        <Textarea id="ownershipNotes" {...form.register("ownershipNotes")} />
-      </div>
-      <div className="space-y-2 md:col-span-2">
-        <Label htmlFor="managementNotes">Management notes</Label>
-        <Textarea id="managementNotes" {...form.register("managementNotes")} />
-      </div> */}
-      {/* {error ? (
-        <p className="md:col-span-2 text-sm text-destructive">{error}</p>
-      ) : null} */}
       <div className="md:col-span-2">
-        <Button type="submit">
-          {hotelId ? "Update hotel" : "Create hotel"}
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {form.formState.isSubmitting
+            ? hotelId
+              ? "Updating..."
+              : "Creating..."
+            : hotelId
+            ? "Update hotel"
+            : "Create hotel"}
         </Button>
       </div>
     </form>
