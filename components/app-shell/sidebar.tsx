@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import {
   Building2,
   ChartLine,
@@ -27,12 +28,20 @@ const iconMap = {
 export function Sidebar({
   pathname,
   role,
-  onNavigate,
 }: {
   pathname: string;
   role: string;
-  onNavigate?: () => void;
 }) {
+  const [optimisticPath, setOptimisticPath] = useState(pathname);
+
+  useEffect(() => {
+    setOptimisticPath(pathname);
+  }, [pathname]);
+
+  const handleLinkClick = (href: string) => {
+    setOptimisticPath(href);
+  };
+
   // Filter nav items based on user role
   const filteredNavItems = navItems.filter((item) => {
     if (item.href === "/settings" && role !== "ADMIN") {
@@ -44,8 +53,8 @@ export function Sidebar({
   return (
     <nav className="sticky top-0 h-screen w-64 bg-white border-r border-slate-200 shadow-sm lg:block overflow-y-auto">
       {/* Header/Logo Section */}
-      <div className="px-4 py-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-        <Link href="/dashboard" className="block group" onClick={onNavigate}>
+      <div className="px-4 py-6 border-b border-slate-100 bg-white">
+        <Link href="/dashboard" className="block group" onClick={() => handleLinkClick("/dashboard")}>
           <div className="flex flex-col items-center text-center space-y-2">
             {/* Icon */}
             <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -69,12 +78,12 @@ export function Sidebar({
       <div className="px-3 py-4 space-y-1">
         {filteredNavItems.map((item) => {
           const Icon = iconMap[item.label as keyof typeof iconMap];
-          const active = pathname.startsWith(item.href);
+          const active = optimisticPath.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={onNavigate}
+              onClick={() => handleLinkClick(item.href)}
               className={cn(
                 "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 active

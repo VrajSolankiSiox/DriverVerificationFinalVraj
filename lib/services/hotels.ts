@@ -20,6 +20,7 @@ function isUniqueConstraintError(error: unknown) {
 
 export async function listHotels() {
   return prisma.hotel.findMany({
+    where: { profileSource: "MANUAL" },
     orderBy: [{ name: "asc" }],
     include: {
       subjectCompSets: true,
@@ -68,6 +69,7 @@ export async function getHotel(id: string) {
 
 export async function createHotel(input: HotelInput, actorId: string) {
   const parsed = hotelSchema.parse(input);
+  const { otaRatings: _otaRatings, ...hotelData } = parsed;
 
   const existing = await prisma.hotel.findFirst({
     where: { name: parsed.name },
@@ -81,11 +83,13 @@ export async function createHotel(input: HotelInput, actorId: string) {
   try {
     created = await prisma.hotel.create({
       data: {
-        ...parsed,
-        websiteUrl: parsed.websiteUrl || null,
-        bookingUrl: parsed.bookingUrl || null,
-        email: parsed.email || null,
-        starLevel: parsed.starLevel ?? null,
+        ...hotelData,
+        profileSource: "MANUAL",
+        websiteUrl: hotelData.websiteUrl || null,
+        bookingUrl: hotelData.bookingUrl || null,
+        email: hotelData.email || null,
+        starLevel: hotelData.starLevel ?? null,
+        otaRatings: parsed.otaRatings ?? Prisma.JsonNull,
         createdById: actorId,
         updatedById: actorId,
       },
@@ -110,6 +114,7 @@ export async function createHotel(input: HotelInput, actorId: string) {
 
 export async function updateHotel(id: string, input: HotelInput, actorId: string) {
   const parsed = hotelSchema.parse(input);
+  const { otaRatings: _otaRatings, ...hotelData } = parsed;
 
   const existing = await prisma.hotel.findFirst({
     where: { name: parsed.name, NOT: { id } },
@@ -124,11 +129,12 @@ export async function updateHotel(id: string, input: HotelInput, actorId: string
     updated = await prisma.hotel.update({
       where: { id },
       data: {
-        ...parsed,
-        websiteUrl: parsed.websiteUrl || null,
-        bookingUrl: parsed.bookingUrl || null,
-        email: parsed.email || null,
-        starLevel: parsed.starLevel ?? null,
+        ...hotelData,
+        websiteUrl: hotelData.websiteUrl || null,
+        bookingUrl: hotelData.bookingUrl || null,
+        email: hotelData.email || null,
+        starLevel: hotelData.starLevel ?? null,
+        otaRatings: parsed.otaRatings ?? Prisma.JsonNull,
         updatedById: actorId,
       },
     });

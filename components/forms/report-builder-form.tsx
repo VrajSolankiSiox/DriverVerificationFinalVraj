@@ -77,6 +77,8 @@ export function ReportBuilderForm({
         </div>
       </div>
 
+      {/* 
+      {/* 
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Sections</h3>
         <div className="space-y-3">
@@ -126,6 +128,8 @@ export function ReportBuilderForm({
           ))}
         </div>
       </div>
+      }
+      */}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit">Save report builder</Button>
     </form>

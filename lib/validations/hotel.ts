@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { OTA_PLATFORMS } from "@/lib/validations/compset";
 
 export const hotelSchema = z.object({
   name: z.string().trim().min(2),
+  isSubject: z.boolean().default(false),
   brand: z.string().optional().nullable(),
   addressLine1: z.string().min(3),
   addressLine2: z.string().optional().nullable(),
@@ -16,6 +18,13 @@ export const hotelSchema = z.object({
   starLevel: z.coerce.number().min(1).max(5).optional().nullable(),
   ownershipNotes: z.string().optional().nullable(),
   managementNotes: z.string().optional().nullable(),
+  // OTA platform ratings: keyed by platform name, value 0–10
+  otaRatings: z
+    .record(
+      z.enum(OTA_PLATFORMS),
+      z.union([z.coerce.number().min(0).max(10), z.literal("")])
+    )
+    .optional(),
 });
 
 export type HotelInput = z.infer<typeof hotelSchema>;

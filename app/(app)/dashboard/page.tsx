@@ -100,24 +100,26 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent reports</CardTitle>
+          <Card className="rounded-2xl border-muted/50 shadow-md overflow-hidden">
+            <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+              <div className="flex">
+                <CardTitle>Recent reports</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {recentReports.length ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Report</TableHead>
+                    <TableRow className="bg-white">
+                      <TableHead className="pl-6">Report</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Updated</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentReports.map((report) => (
-                      <TableRow key={report.id}>
-                        <TableCell>
+                      <TableRow key={report.id} className="transition-colors hover:bg-muted/40">
+                        <TableCell className="pl-6 font-medium">
                           <Link href={`/reports/${report.id}`}>
                             {report.name}
                           </Link>
@@ -131,34 +133,38 @@ export default async function DashboardPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <EmptyState
-                  title="No reports yet"
-                  description="Create the first demo report."
-                  actionHref="/reports/new"
-                  actionLabel="Create report"
-                />
+                <div className="p-10">
+                  <EmptyState
+                    title="No reports yet"
+                    description="Create the first demo report."
+                    actionHref="/reports/new"
+                    actionLabel="Create report"
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent uploads</CardTitle>
+          <Card className="rounded-2xl border-muted/50 shadow-md overflow-hidden">
+            <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+              <div className="flex">
+                <CardTitle>Recent uploads</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {recentUploads.length ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>File</TableHead>
+                    <TableRow className="bg-white">
+                      <TableHead className="pl-6">File</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Hotel</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentUploads.map((upload) => (
-                      <TableRow key={upload.id}>
-                        <TableCell>
+                      <TableRow key={upload.id} className="transition-colors hover:bg-muted/40">
+                        <TableCell className="pl-6 font-medium">
                           <Link href={`/uploads/${upload.id}`}>
                             {upload.fileName}
                           </Link>
@@ -170,22 +176,26 @@ export default async function DashboardPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <EmptyState
-                  title="No uploads yet"
-                  description="Upload an Expedia rate file to begin analysis."
-                  actionHref="/uploads/new"
-                  actionLabel="Start upload"
-                />
+                <div className="p-10">
+                  <EmptyState
+                    title="No uploads yet"
+                    description="Upload an Expedia rate file to begin analysis."
+                    actionHref="/uploads/new"
+                    actionLabel="Start upload"
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Hotels missing website audit</CardTitle>
+        <Card className="rounded-2xl border-muted/50 shadow-md overflow-hidden">
+          <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+            <div className="flex">
+              <CardTitle>Hotels missing website audit</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             {staleHotels.length ? (
               <ul className="space-y-2 text-sm">
                 {staleHotels.map((hotel) => (

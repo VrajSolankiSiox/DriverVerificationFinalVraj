@@ -48,11 +48,14 @@ export function ProtectedShell({
 
   return (
     <div className="flex h-screen bg-slate-50">
-      {isNavigating && <PageLoader />}
+      {/* removed full screen loader */}
       <Sidebar pathname={pathname} role={role} onNavigate={handleNavigate} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header userName={userName} role={role} onNavigate={handleNavigate} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden relative">
+        <Header userName={userName} role={role} pathname={pathname} />
+        <main className="flex-1 overflow-y-auto p-6 relative">
+          {isNavigating && <PageLoader />}
+          {children}
+        </main>
       </div>
     </div>
   );

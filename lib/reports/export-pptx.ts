@@ -48,26 +48,33 @@ function createBarChartSvg(viewModel: ReportViewModel) {
   const compWeekend = viewModel.analytics.weekdayWeekend.weekendCompAverage;
   const values = [subjectWeekday, subjectWeekend, compWeekday, compWeekend];
   const max = Math.max(...values, 1);
-  const barWidth = 60;
-  const gap = 40;
-  const startX = 80;
-  const scale = (value: number) => (value / max) * (height - padding * 2);
-  const bars = [
-    { label: "Subject Weekday", value: subjectWeekday, color: "#2563eb", x: startX },
-    { label: "Subject Weekend", value: subjectWeekend, color: "#3b82f6", x: startX + barWidth + gap },
-    { label: "Comp Weekday", value: compWeekday, color: "#0f172a", x: startX + (barWidth + gap) * 2 },
-    { label: "Comp Weekend", value: compWeekend, color: "#475569", x: startX + (barWidth + gap) * 3 },
+  const chartLeft = 140;
+  const chartRight = width - padding;
+  const chartWidth = chartRight - chartLeft;
+  const barHeight = 22;
+  const groupGap = 28;
+  const groups = [
+    { label: "Weekday", subject: subjectWeekday, comp: compWeekday, y: 62 },
+    { label: "Weekend", subject: subjectWeekend, comp: compWeekend, y: 62 + barHeight * 2 + groupGap + 18 },
   ];
+
+  const barLength = (value: number) => (value / max) * chartWidth;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
     <rect width="100%" height="100%" fill="#ffffff"/>
-    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#94a3b8" />
-    ${bars
-      .map((bar) => {
-        const h = scale(bar.value);
-        const y = height - padding - h;
+    <text x="${chartLeft}" y="24" fill="#1d4ed8" font-size="14">Subject</text>
+    <text x="${chartLeft + 110}" y="24" fill="#60a5fa" font-size="14">Comp Average</text>
+    ${groups
+      .map((group) => {
+        const subjectLen = barLength(group.subject);
+        const compLen = barLength(group.comp);
+        const subjectY = group.y;
+        const compY = group.y + barHeight + 6;
         return `<g>
-        <rect x="${bar.x}" y="${y}" width="${barWidth}" height="${h}" fill="${bar.color}" rx="6" />
-        <text x="${bar.x}" y="${height - 10}" fill="#0f172a" font-size="12">${bar.label}</text>
+        <text x="36" y="${subjectY + barHeight + 6}" fill="#0f172a" font-size="14">${group.label}</text>
+        <rect x="${chartLeft}" y="${subjectY}" width="${subjectLen}" height="${barHeight}" fill="#1d4ed8" rx="6" />
+        <rect x="${chartLeft}" y="${compY}" width="${compLen}" height="${barHeight}" fill="#60a5fa" rx="6" />
+        <text x="${chartLeft + subjectLen + 8}" y="${subjectY + barHeight - 6}" fill="#1d4ed8" font-size="12">${formatCurrency(group.subject)}</text>
+        <text x="${chartLeft + compLen + 8}" y="${compY + barHeight - 6}" fill="#2563eb" font-size="12">${formatCurrency(group.comp)}</text>
       </g>`;
       })
       .join("")}

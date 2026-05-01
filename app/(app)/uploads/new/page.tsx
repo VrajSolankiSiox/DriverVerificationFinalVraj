@@ -10,10 +10,6 @@ export default async function NewUploadPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Upload Expedia rate file</h1>
-        <p className="text-sm text-muted-foreground">Upload, select a sheet, map columns, validate, and import.</p>
-      </div>
       <Card>
         <CardHeader><CardTitle>Upload wizard</CardTitle></CardHeader>
         <CardContent><UploadStartForm hotels={hotels} compsets={compsets} /></CardContent>

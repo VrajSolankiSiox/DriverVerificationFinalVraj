@@ -20,6 +20,18 @@ export function renderReportHtml(viewModel: ReportViewModel, visibility: "CLIENT
     (section) => section.enabled && (visibility === "INTERNAL_FULL" || section.visibility === "CLIENT_SAFE"),
   );
   const summary90 = viewModel.analytics.summariesByWindow["90"];
+  const compMembersWithExpedia = viewModel.compSet.members
+    .filter((member) => member.roleType === "COMP")
+    .map((member) => ({
+      name: member.name,
+      expediaRating: member.otaRatings?.Expedia,
+    }));
+  const compExpediaRatings = compMembersWithExpedia
+    .map((member) => Number(member.expediaRating))
+    .filter((value) => Number.isFinite(value));
+  const avgCompExpediaRating = compExpediaRatings.length
+    ? compExpediaRatings.reduce((sum, value) => sum + value, 0) / compExpediaRatings.length
+    : null;
 
   return `<!DOCTYPE html>
 <html>
@@ -92,6 +104,17 @@ export function renderReportHtml(viewModel: ReportViewModel, visibility: "CLIENT
           <thead><tr><th>Property</th><th>Role</th></tr></thead>
           <tbody>
             ${viewModel.compSet.members.map((member) => `<tr><td>${escapeHtml(member.name)}</td><td>${escapeHtml(member.roleType)}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>OTA Rating Comparison (Expedia)</h2>
+        <p><strong>CompSet Expedia average:</strong> ${avgCompExpediaRating != null ? escapeHtml(formatNumber(avgCompExpediaRating, 2)) : "—"}</p>
+        <table>
+          <thead><tr><th>Competitor</th><th>Expedia Rating</th></tr></thead>
+          <tbody>
+            ${compMembersWithExpedia.map((member) => `<tr><td>${escapeHtml(member.name)}</td><td>${member.expediaRating !== undefined && member.expediaRating !== "" ? escapeHtml(String(member.expediaRating)) : "—"}</td></tr>`).join("")}
           </tbody>
         </table>
       </section>
