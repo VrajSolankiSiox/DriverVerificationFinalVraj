@@ -25,7 +25,8 @@ export default async function CompSetsPage() {
   const compsets = await listCompSets();
 
   const totalMembers = compsets.reduce(
-    (sum, item) => sum + item.members.filter((member) => member.roleType === "COMP").length,
+    (sum, item) =>
+      sum + item.members.filter((member) => member.roleType === "COMP").length,
     0,
   );
 
@@ -123,8 +124,13 @@ export default async function CompSetsPage() {
                     </TableCell>
 
                     <TableCell>
-                      <Badge variant="secondary" className="rounded-lg">
-                        {compSet.members.filter((member) => member.roleType === "COMP").length} Hotels
+                      <Badge className="rounded-lg">
+                        {
+                          compSet.members.filter(
+                            (member) => member.roleType === "COMP",
+                          ).length
+                        }
+                        Hotels
                       </Badge>
                     </TableCell>
 

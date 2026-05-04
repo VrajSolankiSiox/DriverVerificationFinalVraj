@@ -26,7 +26,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       >
         {children}
       </ProtectedShell>
-      ;
     </>
   );
 }
