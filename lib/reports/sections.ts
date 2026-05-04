@@ -21,14 +21,36 @@ export type ReportViewModel = {
     websiteUrl?: string | null;
     roomCount?: number | null;
     starLevel?: number | null;
+    otaRatings?: Record<string, string | number>;
   };
   compSet: {
     id: string;
     name: string;
     version: number;
-    members: Array<{ id: string; name: string; roleType: "SUBJECT" | "COMP" }>;
+    subjectOtaRatings?: Record<string, string | number>;
+    members: Array<{
+      id: string;
+      name: string;
+      roleType: "SUBJECT" | "COMP";
+      otaRatings?: Record<string, string | number>;
+    }>;
   };
   analytics: RateAnalyticsResult;
+  hotelRateSeries?: {
+    points: Array<{ date: string } & Record<string, number | string | null>>;
+    lines: Array<{
+      hotelId: string;
+      hotelName: string;
+      roleType: "SUBJECT" | "COMP";
+    }>;
+  };
+  dataQuality?: {
+    subjectObservedNights: number;
+    nightsWithCompData: number;
+    suspiciousSubjectRows: number;
+    subjectSourceNames: string[];
+    missingCompSetHotelsInData?: string[];
+  };
   websiteAudit: {
     scoreTotal: number | null;
     directBookingUxScore: number | null;
@@ -40,6 +62,13 @@ export type ReportViewModel = {
     seoFindings?: string[];
     notes: string[];
   } | null;
+  competitorWebsiteAudits?: Array<{
+    hotelId: string;
+    hotelName: string;
+    scoreTotal: number | null;
+    seoScoreTotal: number | null;
+    capturedAt: string | null;
+  }>;
   reviewSnapshots?: {
     subject: Array<{ source: string; averageRating: number; reviewCount: number }>;
     comps: Array<{ hotelId: string; hotelName: string; snapshots: Array<{ source: string; averageRating: number; reviewCount: number }> }>;
@@ -181,6 +210,7 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       enabled: true,
       content: {
         websiteAudit: viewModel.websiteAudit,
+        competitors: viewModel.competitorWebsiteAudits ?? [],
       },
     },
     {
@@ -202,6 +232,11 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       enabled: true,
       content: {
         seoScore: viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null,
+        competitorSeoScores: (viewModel.competitorWebsiteAudits ?? []).map((audit) => ({
+          hotelId: audit.hotelId,
+          hotelName: audit.hotelName,
+          seoScoreTotal: audit.seoScoreTotal,
+        })),
         notes: viewModel.websiteAudit?.seoFindings ?? viewModel.seoAudit?.notes ?? [],
       },
     },

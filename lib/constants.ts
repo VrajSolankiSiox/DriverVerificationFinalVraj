@@ -6,9 +6,9 @@ export const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/hotels", label: "Hotels" },
   { href: "/compsets", label: "CompSets" },
-  { href: "/uploads", label: "Uploads" },
   { href: "/reports", label: "Reports" },
-  { href: "/templates", label: "Templates" },
+  { href: "/uploads", label: "Uploads" },
+  // { href: "/templates", label: "Templates" },
   { href: "/settings", label: "Settings" },
 ] as const;
 

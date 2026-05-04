@@ -23,6 +23,7 @@ export function UploadMappingForm({
   const router = useRouter();
   const [mapping, setMapping] = useState<Record<string, string | null>>(defaultMapping);
   const [error, setError] = useState<string | null>(null);
+  const [autoAddUnresolvedHotels, setAutoAddUnresolvedHotels] = useState(true);
 
   return (
     <form
@@ -42,6 +43,7 @@ export function UploadMappingForm({
           },
           saveTemplate: formData.get("saveTemplate") === "on",
           templateName: String(formData.get("templateName") || ""),
+          autoAddUnresolvedHotels,
         };
         const response = await fetch(`/api/uploads/${uploadBatchId}/validate`, {
           method: "POST",
@@ -88,6 +90,14 @@ export function UploadMappingForm({
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="saveTemplate" /> Save as reusable template
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={autoAddUnresolvedHotels}
+          onChange={(event) => setAutoAddUnresolvedHotels(event.target.checked)}
+        />
+        Auto-add unmatched hotels to compset (recommended)
       </label>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit">Validate mapping</Button>

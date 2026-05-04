@@ -57,6 +57,8 @@ model VerificationToken {
 model Hotel {
   id               String            @id @default(cuid())
   name             String
+  isSubject        Boolean            @default(false)
+  profileSource    HotelProfileSource @default(MANUAL)
   brand            String?
   addressLine1     String
   addressLine2     String?
@@ -72,6 +74,7 @@ model Hotel {
   starLevel        Decimal?          @db.Decimal(3, 1)
   ownershipNotes   String?
   managementNotes  String?
+  otaRatings       Json?
   createdById      String
   updatedById      String
   createdAt        DateTime          @default(now())
@@ -149,6 +152,7 @@ model UploadBatch {
   fileType             String
   fileSizeBytes        Int
   storagePath          String
+  fileBlob             Bytes?
   subjectHotelId       String
   compSetId            String
   status               UploadStatus      @default(DRAFT)
@@ -165,6 +169,7 @@ model UploadBatch {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   observations         RateObservation[]
+  reports              Report[]
   compSet              CompSet           @relation(fields: [compSetId], references: [id], onDelete: Cascade)
   subjectHotel         Hotel             @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
 
@@ -314,6 +319,7 @@ model Report {
   subjectHotelId         String
   compSetId              String
   compSetVersion         Int
+  uploadBatchId          String?
   status                 ReportStatus     @default(DRAFT)
   confidenceLevel        ConfidenceLevel?
   executiveSummary       String?
@@ -329,12 +335,14 @@ model Report {
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
   exports                ExportArtifact[]
+  uploadBatch            UploadBatch?     @relation(fields: [uploadBatchId], references: [id], onDelete: SetNull)
   compSet                CompSet          @relation(fields: [compSetId], references: [id], onDelete: Cascade)
   subjectHotel           Hotel            @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
   sections               ReportSection[]
 
   @@index([subjectHotelId, createdAt])
   @@index([status])
+  @@index([uploadBatchId])
 }
 
 model ReportSection {
@@ -396,6 +404,11 @@ enum UserRole {
 enum HotelRoleType {
   SUBJECT
   COMP
+}
+
+enum HotelProfileSource {
+  MANUAL
+  AUTO_COMPSET
 }
 
 enum UploadStatus {

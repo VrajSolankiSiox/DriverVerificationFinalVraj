@@ -49,6 +49,7 @@ export const uploadMappingSchema = z.object({
     stripCommas: z.boolean().default(true),
   }),
   saveTemplate: z.boolean().default(false),
+  autoAddUnresolvedHotels: z.boolean().default(true),
 });
 
 export const uploadImportSchema = z.object({

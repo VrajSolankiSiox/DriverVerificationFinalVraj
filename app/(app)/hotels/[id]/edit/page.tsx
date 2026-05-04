@@ -13,9 +13,6 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Edit hotel</h1>
-      </div>
       <Card>
         <CardHeader><CardTitle>{hotel.name}</CardTitle></CardHeader>
         <CardContent>
@@ -35,6 +32,7 @@ export default async function EditHotelPage({ params }: { params: Promise<{ id: 
             starLevel: hotel.starLevel ? Number(hotel.starLevel) : undefined,
             ownershipNotes: hotel.ownershipNotes ?? undefined,
             managementNotes: hotel.managementNotes ?? undefined,
+            otaRatings: (hotel.otaRatings as Record<string, string | number> | null) ?? undefined,
           }} />
         </CardContent>
       </Card>

@@ -41,16 +41,27 @@ export default async function HotelDetailPage({ params }: { params: Promise<{ id
             <p><strong>Star level:</strong> {hotel.starLevel ? Number(hotel.starLevel).toFixed(1) : "—"}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle>Recent website audits</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="rounded-2xl border-muted/50 shadow-md">
+          <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+            <div className="flex">
+              <CardTitle>Recent website audits</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
             {hotel.websiteSnapshots.length ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Score</TableHead><TableHead>SEO</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow className="bg-white">
+                    <TableHead className="pl-6">Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>SEO</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {hotel.websiteSnapshots.map((snapshot) => (
-                    <TableRow key={snapshot.id}>
-                      <TableCell>{formatDate(snapshot.createdAt)}</TableCell>
+                    <TableRow key={snapshot.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell className="pl-6">{formatDate(snapshot.createdAt)}</TableCell>
                       <TableCell>{snapshot.status}</TableCell>
                       <TableCell>{snapshot.scoreTotal ?? "—"}</TableCell>
                       <TableCell>{snapshot.seoScoreTotal ?? "—"}</TableCell>
@@ -59,20 +70,33 @@ export default async function HotelDetailPage({ params }: { params: Promise<{ id
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-sm text-muted-foreground">No website audit has been run yet.</p>
+              <div className="p-6">
+                <p className="text-sm text-muted-foreground">No website audit has been run yet.</p>
+              </div>
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle>Review snapshots</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="rounded-2xl border-muted/50 shadow-md">
+          <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+            <div className="flex">
+              <CardTitle>Review snapshots</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
             {hotel.reviewSnapshots?.length ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Source</TableHead><TableHead>Rating</TableHead><TableHead>Count</TableHead><TableHead>Captured</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow className="bg-white">
+                    <TableHead className="pl-6">Source</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Count</TableHead>
+                    <TableHead>Captured</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {hotel.reviewSnapshots.map((snapshot) => (
-                    <TableRow key={snapshot.id}>
-                      <TableCell>{snapshot.source}</TableCell>
+                    <TableRow key={snapshot.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell className="pl-6 font-medium">{snapshot.source}</TableCell>
                       <TableCell>{snapshot.averageRating ? Number(snapshot.averageRating).toFixed(1) : "—"}</TableCell>
                       <TableCell>{snapshot.reviewCount ?? "—"}</TableCell>
                       <TableCell>{formatDate(snapshot.capturedAt)}</TableCell>
@@ -81,7 +105,9 @@ export default async function HotelDetailPage({ params }: { params: Promise<{ id
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-sm text-muted-foreground">No review snapshots yet. Run a review snapshot to capture TripAdvisor and Google ratings.</p>
+              <div className="p-6">
+                <p className="text-sm text-muted-foreground">No review snapshots yet. Run a review snapshot to capture TripAdvisor and Google ratings.</p>
+              </div>
             )}
           </CardContent>
         </Card>

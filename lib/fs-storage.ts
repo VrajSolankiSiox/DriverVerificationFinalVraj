@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "fs/promises";
 import path from "path";
 
 const storageRoot = process.env.VERCEL
@@ -47,4 +47,14 @@ export async function saveBufferToPath(filePath: string, buffer: Buffer) {
 
 export async function readBufferFromPath(filePath: string) {
   return readFile(filePath);
+}
+export async function deleteFileFromPath(filePath: string) {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code !== "ENOENT") {
+      throw error;
+    }
+  }
 }
