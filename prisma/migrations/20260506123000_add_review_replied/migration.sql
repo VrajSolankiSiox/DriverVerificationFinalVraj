@@ -1,2 +1,0 @@
-ALTER TABLE "Hotel"
-ADD COLUMN IF NOT EXISTS "reviewReplied" BOOLEAN DEFAULT false;
