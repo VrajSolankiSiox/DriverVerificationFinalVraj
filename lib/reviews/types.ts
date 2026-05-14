@@ -1,4 +1,4 @@
-export type ReviewSource = "TRIPADVISOR" | "GOOGLE" | "EXPEDIA" | "BOOKING";
+export type ReviewSource = "GOOGLE" | "EXPEDIA" | "BOOKING";
 
 export type ReviewScraperResult = {
   source: ReviewSource;

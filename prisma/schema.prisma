@@ -68,6 +68,7 @@ model Hotel {
   websiteUrl       String?
   bookingUrl       String?
   expediaUrl       String?
+  ownerName        String?
   phone            String?
   email            String?
   roomCount        Int?
@@ -75,6 +76,7 @@ model Hotel {
   ownershipNotes   String?
   managementNotes  String?
   otaRatings       Json?
+  reviewReplied    Boolean?          @default(false)
   createdById      String
   updatedById      String
   createdAt        DateTime          @default(now())
@@ -85,6 +87,7 @@ model Hotel {
   reports          Report[]
   reviewSnapshots  ReviewSnapshot[]
   uploadBatches    UploadBatch[]
+  demoSessions     DemoSession[]
   websiteSnapshots WebsiteSnapshot[]
 
   @@unique([name])
@@ -170,6 +173,7 @@ model UploadBatch {
   updatedAt            DateTime          @updatedAt
   observations         RateObservation[]
   reports              Report[]
+  demoSessions         DemoSession[]
   compSet              CompSet           @relation(fields: [compSetId], references: [id], onDelete: Cascade)
   subjectHotel         Hotel             @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
 
@@ -339,6 +343,7 @@ model Report {
   compSet                CompSet          @relation(fields: [compSetId], references: [id], onDelete: Cascade)
   subjectHotel           Hotel            @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
   sections               ReportSection[]
+  demoSessions           DemoSession[]
 
   @@index([subjectHotelId, createdAt])
   @@index([status])
@@ -432,10 +437,44 @@ enum SnapshotStatus {
 }
 
 enum ReviewSource {
-  TRIPADVISOR
   GOOGLE
   EXPEDIA
   BOOKING
+}
+
+model DemoSession {
+  id              String     @id @default(cuid())
+  hotelId         String
+  uploadBatchId   String?
+  reportId        String?
+  hotelName       String
+  hotelOwnerName  String?
+  scheduledDate   DateTime?
+  outcome         DemoOutcome @default(PENDING)
+  conductedBy     String?
+  demoDate        DateTime?
+  ownerFeedback   String?
+  additionalNotes String?
+  createdById     String
+  updatedById     String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  hotel           Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  uploadBatch     UploadBatch? @relation(fields: [uploadBatchId], references: [id], onDelete: SetNull)
+  report          Report?      @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([hotelId, createdAt])
+  @@index([uploadBatchId])
+  @@index([reportId])
+  @@index([outcome])
+}
+
+enum DemoOutcome {
+  PENDING
+  NO_SHOW
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
 }
 
 enum AlertMetric {

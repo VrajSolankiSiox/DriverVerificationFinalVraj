@@ -21,7 +21,17 @@ export default async function NewReportPage({
           select: {
             hotelId: true,
             roleType: true,
-            hotel: { select: { name: true } },
+            hotel: {
+              select: {
+                name: true,
+                websiteSnapshots: {
+                  where: { status: "COMPLETE" },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                  select: { seoScoreTotal: true },
+                },
+              },
+            },
           },
           orderBy: { displayOrder: "asc" },
         },
@@ -49,7 +59,15 @@ export default async function NewReportPage({
         <CardContent>
           <ReportCreateForm
             hotels={hotels}
-            compsets={compsets}
+            compsets={compsets.map((compset) => ({
+              ...compset,
+              members: compset.members.map((member) => ({
+                hotelId: member.hotelId,
+                roleType: member.roleType,
+                hotel: { name: member.hotel.name },
+                hasSeo: member.hotel.websiteSnapshots?.[0]?.seoScoreTotal !== null && member.hotel.websiteSnapshots?.[0]?.seoScoreTotal !== undefined,
+              })),
+            }))}
             uploads={uploads}
             defaultUploadBatchId={uploadBatchId}
           />

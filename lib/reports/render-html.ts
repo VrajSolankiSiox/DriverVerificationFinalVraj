@@ -70,7 +70,7 @@ export function renderReportHtml(viewModel: ReportViewModel, visibility: "CLIENT
       </section>
 
       <section>
-        <h2>Where You're Losing</h2>
+        <h2>Competitive Performance Snapshot</h2>
         <table>
           <thead><tr><th>Metric</th><th>You</th><th>Comp Avg</th><th>Rank</th><th>Verdict</th></tr></thead>
           <tbody>
@@ -186,10 +186,6 @@ export function renderReportHtml(viewModel: ReportViewModel, visibility: "CLIENT
         </div>
       </section>` : ""}
 
-      <section>
-        <h2>Methodology</h2>
-        <p>${escapeHtml(String((sections.find((section) => section.type === "DISCLAIMER_METHOD")?.content.text ?? "")))}</p>
-      </section>
     </div>
   </body>
 </html>`;

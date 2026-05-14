@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ArrowUpRight } from "lucide-react";
+import { Plus, EllipsisVertical, Eye } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,8 @@ export default async function UploadsPage() {
   const uploads = await listUploadBatches();
   return (
     <div className="space-y-8  ">
-      {/* <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Uploads</h1>
-          <p className="text-sm text-muted-foreground">Expedia files, mappings, validation, and import batches.</p>
-        </div>
-      </div> */}
-      <Card className="rounded-2xl border-muted/50 shadow-md overflow-hidden">
-        <CardHeader className="border-b bg-white flex items-center flex-row justify-between">
+      <Card className="overflow-visible rounded-2xl border-muted/50 shadow-md">
+        <CardHeader className="flex flex-row items-center justify-between border-b bg-white">
           <div className="flex">
             <CardTitle>Upload batches</CardTitle>
           </div>
@@ -32,7 +26,7 @@ export default async function UploadsPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="overflow-visible p-0">
           {uploads.length ? (
             <Table>
               <TableHeader>
@@ -42,7 +36,7 @@ export default async function UploadsPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Imported</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-[80px]" />
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -50,15 +44,33 @@ export default async function UploadsPage() {
                   const summary = upload.summaryJson as { inserted?: number } | null;
                   return (
                     <TableRow key={upload.id} className="transition-colors hover:bg-muted/40">
-                      <TableCell className="pl-6 text-md font-medium"><Link href={`/uploads/${upload.id}`} className="text-foreground hover:text-primary transition-colors">{upload.fileName}</Link></TableCell>
+                      <TableCell className="pl-6 text-md font-medium"><Link href={`/uploads/${upload.id}`} className="text-foreground transition-colors hover:text-primary">{upload.fileName}</Link></TableCell>
                       <TableCell>{upload.subjectHotel.name}</TableCell>
                       <TableCell>{upload.status}</TableCell>
-                      <TableCell>{summary?.inserted ?? "—"}</TableCell>
+                      <TableCell>{summary?.inserted ?? "-"}</TableCell>
                       <TableCell>{formatDate(upload.createdAt)}</TableCell>
-                      <TableCell>
-                        <Link href={`/uploads/${upload.id}`} className="inline-flex items-center text-muted-foreground hover:text-primary">
-                          <ArrowUpRight className="h-4 w-4" />
-                        </Link>
+                      <TableCell className="text-right">
+                        <details name="upload-actions-menu" className="relative inline-block">
+                          <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground">
+                            <EllipsisVertical className="h-4 w-4" />
+                          </summary>
+                          <div className="absolute right-0 z-50 mt-1 min-w-[140px] rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                            <Link
+                              href={`/uploads/${upload.id}`}
+                              className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View
+                            </Link>
+                            <Link
+                              href={`/uploads/${upload.id}/edit`}
+                              className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              <Plus className="h-4 w-4 rotate-45 transform" />
+                              Edit
+                            </Link>
+                          </div>
+                        </details>
                       </TableCell>
                     </TableRow>
                   );

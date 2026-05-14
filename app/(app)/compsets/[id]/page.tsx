@@ -1,7 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, ArrowUpRight, FileText, UploadCloud } from "lucide-react";
+import { ArrowUpRight, Building2, FileText, UploadCloud } from "lucide-react";
 
+import { MemberWebsiteAuditButton } from "@/components/compsets/member-website-audit-button";
+import { RunAllCompetitorAuditsButton } from "@/components/compsets/run-all-competitor-audits-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,10 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCompSet, parseCompMemberOtaRatings } from "@/lib/services/compsets";
+import { getCompSet, parseCompMemberMetadata } from "@/lib/services/compsets";
 import { formatDate } from "@/lib/utils";
-import { MemberWebsiteAuditButton } from "@/components/compsets/member-website-audit-button";
-import { RunAllCompetitorAuditsButton } from "@/components/compsets/run-all-competitor-audits-button";
 
 export default async function CompSetDetailPage({
   params,
@@ -34,8 +34,7 @@ export default async function CompSetDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{compSet.name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -55,13 +54,13 @@ export default async function CompSetDetailPage({
           <RunAllCompetitorAuditsButton competitorHotelIds={competitorHotelIds} />
           <Button asChild variant="outline">
             <Link href={`/reports/new?compSetId=${compSet.id}`}>
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="mr-2 h-4 w-4" />
               New Report
             </Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={`/uploads/new?compSetId=${compSet.id}`}>
-              <UploadCloud className="h-4 w-4 mr-2" />
+              <UploadCloud className="mr-2 h-4 w-4" />
               Upload Rates
             </Link>
           </Button>
@@ -69,9 +68,8 @@ export default async function CompSetDetailPage({
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        {/* ── Competitor Members table ── */}
         <Card className="xl:col-span-2 rounded-2xl border-muted/50 shadow-md">
-          <CardHeader className="border-b bg-white flex flex-row items-center justify-between rounded-t-2xl">
+          <CardHeader className="flex flex-row items-center justify-between rounded-t-2xl border-b bg-white">
             <CardTitle>
               Competitor Hotels{" "}
               <span className="ml-2 inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
@@ -86,6 +84,8 @@ export default async function CompSetDetailPage({
                   <TableRow className="bg-white">
                     <TableHead className="pl-6">#</TableHead>
                     <TableHead>Hotel</TableHead>
+                    <TableHead>Star</TableHead>
+                    <TableHead>Rooms</TableHead>
                     <TableHead>Expedia Rating</TableHead>
                     <TableHead>Website Score</TableHead>
                     <TableHead>SEO Score</TableHead>
@@ -96,8 +96,8 @@ export default async function CompSetDetailPage({
                 <TableBody>
                   {compMembers.map((member) => {
                     const latestSnapshot = member.hotel.websiteSnapshots?.[0];
-                    const otaRatings = parseCompMemberOtaRatings(member.notes);
-                    const expediaRating = otaRatings.Expedia;
+                    const memberMetadata = parseCompMemberMetadata(member.notes);
+                    const expediaRating = memberMetadata.ratings.expedia?.value;
                     return (
                       <TableRow
                         key={member.id}
@@ -108,7 +108,7 @@ export default async function CompSetDetailPage({
                         </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                             <Link
                               href={`/hotels/${member.hotel.id}`}
                               className="hover:text-primary transition-colors"
@@ -116,24 +116,30 @@ export default async function CompSetDetailPage({
                               {member.hotel.name}
                             </Link>
                           </div>
-                          {member.hotel.websiteUrl && (
+                          {member.hotel.websiteUrl ? (
                             <a
                               href={member.hotel.websiteUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs text-muted-foreground hover:text-primary truncate block max-w-[200px]"
+                              className="block max-w-[200px] truncate text-xs text-muted-foreground hover:text-primary"
                             >
                               {member.hotel.websiteUrl}
                             </a>
-                          )}
+                          ) : null}
                         </TableCell>
                         <TableCell>
-                          {expediaRating !== undefined && expediaRating !== "" ? (
+                          {memberMetadata.starRating != null
+                            ? memberMetadata.starRating.toFixed(1)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>{memberMetadata.roomCount ?? "-"}</TableCell>
+                        <TableCell>
+                          {expediaRating ? (
                             <span className="inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium">
                               {expediaRating}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -142,7 +148,7 @@ export default async function CompSetDetailPage({
                               {latestSnapshot.scoreTotal}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -151,7 +157,7 @@ export default async function CompSetDetailPage({
                               {latestSnapshot.seoScoreTotal}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -183,9 +189,7 @@ export default async function CompSetDetailPage({
           </CardContent>
         </Card>
 
-        {/* ── Sidebar ── */}
         <div className="space-y-6">
-          {/* CompSet Info */}
           <Card className="rounded-2xl border-muted/50 shadow-sm">
             <CardHeader>
               <CardTitle>CompSet Info</CardTitle>
@@ -213,21 +217,20 @@ export default async function CompSetDetailPage({
               <p>
                 <strong>Updated:</strong> {formatDate(compSet.updatedAt)}
               </p>
-              {compSet.notes && (
+              {compSet.notes ? (
                 <p>
                   <strong>Notes:</strong> {compSet.notes}
                 </p>
-              )}
+              ) : null}
             </CardContent>
           </Card>
 
-          {/* Reports */}
           <Card className="rounded-2xl border-muted/50 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Reports</CardTitle>
               <Button asChild size="sm" variant="ghost">
                 <Link href={`/reports/new?compSetId=${compSet.id}`}>
-                  <FileText className="h-4 w-4 mr-1" />
+                  <FileText className="mr-1 h-4 w-4" />
                   New
                 </Link>
               </Button>
@@ -239,10 +242,10 @@ export default async function CompSetDetailPage({
                     <li key={report.id}>
                       <Link
                         href={`/reports/${report.id}`}
-                        className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/40 transition-colors"
+                        className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/40"
                       >
-                        <span className="font-medium truncate">{report.name}</span>
-                        <span className="ml-2 shrink-0 inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        <span className="truncate font-medium">{report.name}</span>
+                        <span className="ml-2 inline-flex shrink-0 items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           {report.status}
                         </span>
                       </Link>
@@ -257,7 +260,6 @@ export default async function CompSetDetailPage({
             </CardContent>
           </Card>
 
-          {/* Recent Uploads */}
           <Card className="rounded-2xl border-muted/50 shadow-sm">
             <CardHeader>
               <CardTitle>Recent Uploads</CardTitle>
@@ -269,10 +271,10 @@ export default async function CompSetDetailPage({
                     <li key={batch.id}>
                       <Link
                         href={`/uploads/${batch.id}`}
-                        className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/40 transition-colors"
+                        className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/40"
                       >
-                        <span className="font-medium truncate">{batch.fileName}</span>
-                        <span className="ml-2 shrink-0 inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        <span className="truncate font-medium">{batch.fileName}</span>
+                        <span className="ml-2 inline-flex shrink-0 items-center rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           {batch.status}
                         </span>
                       </Link>

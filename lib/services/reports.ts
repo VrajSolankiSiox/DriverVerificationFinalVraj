@@ -5,7 +5,7 @@ import { format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { evaluateAlerts } from "@/lib/services/alerts";
 import { getLatestReviewSnapshots } from "@/lib/services/reviews";
-import { parseCompMemberOtaRatings } from "@/lib/services/compsets";
+import { parseCompMemberMetadata } from "@/lib/services/compsets";
 import { canApproveReport } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { computeRateAnalytics, type AnalyticsObservation } from "@/lib/analytics/rate-analytics";
@@ -37,6 +37,8 @@ function isSyntheticCompHotelName(value: string) {
 function getManualRatePlanTag(reportId: string) {
   return `MANUAL_REPORT:${reportId}`;
 }
+
+const MANUAL_REVIEW_SCREENSHOT_MARKER = "MANUAL_RESPONSE_SCREENSHOT";
 
 function buildHotelRateSeries(
   members: Array<{
@@ -70,7 +72,7 @@ function buildHotelRateSeries(
   >();
 
   for (const observation of observations) {
-    const date = format(startOfDay(observation.stayDate), "yyyy-MM-dd");
+    const date = observation.stayDate.toISOString().split("T")[0];
     const key = `${observation.hotelId}|${date}`;
     const existing = latestByHotelDate.get(key);
     if (!existing || existing.captureDate < observation.captureDate) {
@@ -159,7 +161,7 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
   });
 
   const hotelIds = report.compSet.members.map((member) => member.hotelId);
-  const presentationConfig = (report.presentationConfigJson as { dataSource?: "UPLOAD" | "MANUAL"; manualRatePlanTag?: string } | null) ?? null;
+  const presentationConfig = (report.presentationConfigJson as { dataSource?: "UPLOAD" | "MANUAL"; manualRatePlanTag?: string; includeSeoComparison?: boolean } | null) ?? null;
   const manualRatePlanTag =
     !report.uploadBatchId &&
     presentationConfig?.dataSource === "MANUAL" &&
@@ -201,6 +203,28 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
   }
 
   const reviewSnapshotsByHotel = await getLatestReviewSnapshots(hotelIds);
+  const reviewResponseScreenshotRows = await prisma.reviewSnapshot.findMany({
+    where: {
+      hotelId: { in: hotelIds },
+      sentimentSummary: MANUAL_REVIEW_SCREENSHOT_MARKER,
+    },
+    orderBy: { capturedAt: "desc" },
+  });
+  const reviewResponseScreenshotsByHotel: Record<
+    string,
+    Array<{ platform: string; imageDataUrl: string | null; capturedAt: string; presence: "RESPONDED" | "NOT_RESPONDED" | "NO_PRESENCE" | "NO_REVIEW" }>
+  > = {};
+  for (const row of reviewResponseScreenshotRows) {
+    const raw = (row.rawJson as { platform?: string; imageDataUrl?: string | null; presence?: "RESPONDED" | "NOT_RESPONDED" | "NO_PRESENCE" | "NO_REVIEW" } | null) ?? null;
+    if (!raw?.platform) continue;
+    reviewResponseScreenshotsByHotel[row.hotelId] = reviewResponseScreenshotsByHotel[row.hotelId] ?? [];
+    reviewResponseScreenshotsByHotel[row.hotelId].push({
+      platform: raw.platform,
+      imageDataUrl: raw.imageDataUrl ?? null,
+      capturedAt: row.capturedAt.toISOString(),
+      presence: raw.presence ?? (raw.imageDataUrl ? "RESPONDED" : "NO_PRESENCE"),
+    });
+  }
   const subjectReview = reviewSnapshotsByHotel[report.subjectHotelId] ?? [];
   const compReviews = report.compSet.members
     .filter((m) => m.roleType === "COMP")
@@ -293,15 +317,18 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
       id: report.compSet.id,
       name: report.compSet.name,
       version: report.compSet.version,
-      subjectOtaRatings: parseCompMemberOtaRatings(
+      subjectOtaRatings: parseCompMemberMetadata(
         report.compSet.members.find((member) => member.roleType === "SUBJECT")?.notes,
-      ),
-      members: report.compSet.members.map((member) => ({
+      ).otaRatings,
+      members: report.compSet.members.map((member) => {
+        const parsedMetadata = parseCompMemberMetadata(member.notes);
+        return {
         id: member.hotel.id,
         name: member.hotel.name,
         roleType: member.roleType,
-        otaRatings: parseCompMemberOtaRatings(member.notes),
-      })),
+        otaRatings: parsedMetadata.otaRatings,
+      };
+      }),
     },
     analytics,
     hotelRateSeries,
@@ -330,10 +357,40 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
       subject: subjectReview,
       comps: compReviews,
     },
+    comparisonDataset: {
+      observations: observations.map((observation) => ({
+        hotelId: observation.hotelId,
+        hotelName: observation.hotel.name,
+        stayDate: observation.stayDate.toISOString(),
+        captureDate: observation.captureDate.toISOString(),
+        nightlyRate: Number(observation.nightlyRate),
+        currency: observation.currency,
+        availabilityStatus: observation.availabilityStatus,
+        roomType: observation.roomType,
+      })),
+      hotels: report.compSet.members.map((member) => {
+        const parsedMetadata = parseCompMemberMetadata(member.notes);
+        return {
+          id: member.hotel.id,
+          name: member.hotel.name,
+          roleType: member.roleType,
+          otaRatings: parsedMetadata.otaRatings,
+        };
+      }),
+      reviewSnapshotsByHotel: Object.fromEntries(
+        Object.entries(reviewSnapshotsByHotel).map(([hotelId, snapshots]) => [
+          hotelId,
+          snapshots.map((snapshot) => ({
+            source: snapshot.source,
+            averageRating: snapshot.averageRating,
+            reviewCount: snapshot.reviewCount,
+          })),
+        ]),
+      ),
+      reviewResponseScreenshotsByHotel,
+    },
     seoAudit: seoAudit ? { total: seoAudit.breakdown?.total ?? 0, notes: seoAudit.notes ?? [] } : null,
-    manualExecutiveSummary: report.executiveSummary,
-    manualOpportunityNotes: report.manualOpportunityNotes,
-    methodologyNote: report.methodologyNote,
+    includeSeoComparison: presentationConfig?.includeSeoComparison !== false,
   };
 }
 
@@ -343,6 +400,7 @@ export async function createReport(
     subjectHotelId: string;
     compSetId: string;
     dataSource?: "UPLOAD" | "MANUAL";
+    includeSeoComparison?: boolean;
     uploadBatchId?: string;
     manualRates?: Array<{ hotelId: string; date: string; nightlyRate: number }>;
   },
@@ -354,6 +412,42 @@ export async function createReport(
   if (compSet.subjectHotelId !== parsed.subjectHotelId) {
     throw new Error("Selected compset does not belong to the chosen subject hotel.");
   }
+  const members = await prisma.compSetMember.findMany({
+    where: { compSetId: parsed.compSetId },
+    select: { hotelId: true },
+  });
+  const memberHotelIds = members.map((member) => member.hotelId);
+  const snapshots = memberHotelIds.length
+    ? await prisma.websiteSnapshot.findMany({
+        where: { hotelId: { in: memberHotelIds }, status: "COMPLETE" },
+        orderBy: { createdAt: "desc" },
+        select: { hotelId: true, seoScoreTotal: true },
+      })
+    : [];
+  const latestByHotel = new Map<string, (typeof snapshots)[number]>();
+  for (const snapshot of snapshots) {
+    if (!latestByHotel.has(snapshot.hotelId)) {
+      latestByHotel.set(snapshot.hotelId, snapshot);
+    }
+  }
+  const seoHotelsWithData = memberHotelIds.filter((hotelId) => latestByHotel.get(hotelId)?.seoScoreTotal !== null).length;
+  const seoHotelsWithoutData = Math.max(memberHotelIds.length - seoHotelsWithData, 0);
+  const seoCoverage =
+    seoHotelsWithData === memberHotelIds.length
+      ? "ALL"
+      : seoHotelsWithData === 0
+        ? "NONE"
+        : "MIXED";
+  const includeSeoComparison =
+    parsed.includeSeoComparison &&
+    seoCoverage !== "NONE";
+  const seoCoverageWarning =
+    parsed.includeSeoComparison && seoCoverage === "MIXED"
+      ? `SEO data is mixed (${seoHotelsWithData} with SEO, ${seoHotelsWithoutData} without). Including SEO comparison only where available.`
+      : parsed.includeSeoComparison && seoCoverage === "NONE"
+        ? "No hotels in this compset have SEO data. SEO section was disabled."
+        : null;
+
   if (parsed.dataSource === "UPLOAD") {
     const uploadBatch = await prisma.uploadBatch.findUniqueOrThrow({
       where: { id: parsed.uploadBatchId },
@@ -385,8 +479,13 @@ export async function createReport(
         uploadBatchId: parsed.uploadBatchId,
         createdById: actorId,
         updatedById: actorId,
-        presentationConfigJson: { dataSource: "UPLOAD" },
-        methodologyNote: "Insights are based on uploaded market rate observations and publicly observable website data. This is not a substitute for PMS, CRS, STR, or proprietary financial records. Observations represent available data at the time of analysis.",
+        presentationConfigJson: {
+          dataSource: "UPLOAD",
+          includeSeoComparison,
+          seoCoverage,
+          seoHotelsWithData,
+          seoHotelsWithoutData,
+        },
       },
     });
 
@@ -400,13 +499,10 @@ export async function createReport(
       message: `Created report ${created.name}`,
     });
 
-    return prisma.report.findUniqueOrThrow({ where: { id: created.id } });
+    const report = await prisma.report.findUniqueOrThrow({ where: { id: created.id } });
+    return { report, warning: seoCoverageWarning };
   }
 
-  const members = await prisma.compSetMember.findMany({
-    where: { compSetId: parsed.compSetId },
-    select: { hotelId: true },
-  });
   const allowedHotelIds = new Set(members.map((member) => member.hotelId));
   const todayCaptureDate = startOfDay(new Date());
 
@@ -442,8 +538,13 @@ export async function createReport(
       compSetVersion: compSet.version,
       createdById: actorId,
       updatedById: actorId,
-      presentationConfigJson: { dataSource: "MANUAL" },
-      methodologyNote: "Insights are based on manually entered market rate observations and publicly observable website data. This is not a substitute for PMS, CRS, STR, or proprietary financial records. Observations represent available data at the time of analysis.",
+      presentationConfigJson: {
+        dataSource: "MANUAL",
+        includeSeoComparison,
+        seoCoverage,
+        seoHotelsWithData,
+        seoHotelsWithoutData,
+      },
     },
   });
 
@@ -488,6 +589,10 @@ export async function createReport(
         presentationConfigJson: {
           dataSource: "MANUAL",
           manualRatePlanTag,
+          includeSeoComparison,
+          seoCoverage,
+          seoHotelsWithData,
+          seoHotelsWithoutData,
         },
       },
     }),
@@ -507,7 +612,8 @@ export async function createReport(
     message: `Created report ${created.name}`,
   });
 
-  return prisma.report.findUniqueOrThrow({ where: { id: created.id } });
+  const report = await prisma.report.findUniqueOrThrow({ where: { id: created.id } });
+  return { report, warning: seoCoverageWarning };
 }
 
 export async function refreshReport(reportId: string, actorId: string) {
@@ -558,9 +664,6 @@ export async function refreshReport(reportId: string, actorId: string) {
 export async function updateReport(
   input: {
     reportId: string;
-    executiveSummary?: string | null;
-    manualOpportunityNotes?: string | null;
-    methodologyNote?: string | null;
     status?: "DRAFT" | "REVIEW_READY" | "APPROVED" | "EXPORTED";
     sectionOrder?: Array<{ id: string; displayOrder: number; enabled: boolean; visibility: "CLIENT_SAFE" | "INTERNAL_ONLY" }>;
   },
@@ -577,9 +680,6 @@ export async function updateReport(
   await prisma.report.update({
     where: { id: parsed.reportId },
     data: {
-      executiveSummary: parsed.executiveSummary ?? null,
-      manualOpportunityNotes: parsed.manualOpportunityNotes ?? null,
-      methodologyNote: parsed.methodologyNote ?? null,
       status,
       approvedAt: status === "APPROVED" ? new Date() : undefined,
       approvedById: status === "APPROVED" ? actorId : undefined,

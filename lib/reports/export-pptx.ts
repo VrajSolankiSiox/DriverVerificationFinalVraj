@@ -123,7 +123,7 @@ export async function generatePptx(
 
   const exec = pptx.addSlide();
   exec.addText("Executive Summary", { x: 0.5, y: 0.4, w: 5, h: 0.5, fontSize: 20, bold: true });
-  exec.addText(viewModel.manualExecutiveSummary || "See application narrative.", {
+  exec.addText("See application narrative.", {
     x: 0.6,
     y: 1.0,
     w: 6.2,

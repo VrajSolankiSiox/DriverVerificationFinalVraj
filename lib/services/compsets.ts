@@ -1,16 +1,29 @@
 import { HotelRoleType } from "@prisma/client";
+import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { compsetHotelRowSchema, compsetSchema } from "@/lib/validations/compset";
+import { compsetSchema } from "@/lib/validations/compset";
 import { logActivity } from "@/lib/activity-log";
 import { runWebsiteAudit } from "@/lib/services/website-audit";
 
 type CompSetHotelInputRow = {
   hotelName: string;
-  websiteUrl?: string;
-  bookingUrl?: string;
-  expediaLink?: string;
-  otaRatings?: Record<string, string | number>;
+  starRating: number;
+  roomCount: number;
+  ratings: {
+    google: string;
+    expedia: string;
+    booking: string;
+    agoda: string;
+    priceline: string;
+    tripadvisor: string;
+  };
+  organicSearchPositions: {
+    expedia: string;
+    bookingCom: string;
+    priceline: string;
+    google: string;
+  };
 };
 
 type CompSetUpsertInput = {
@@ -19,12 +32,121 @@ type CompSetUpsertInput = {
   compHotels: CompSetHotelInputRow[];
 };
 
+const ratingPattern = /^\s*(?:10(?:\.0)?|[0-9](?:\.[0-9])?)\s*\(\s*([0-9]+)\s*\)\s*$/;
+
+type ParsedRatingWithCount = {
+  value: string;
+  score: number;
+  reviewCount: number;
+};
+
+function parseRatingWithCount(input: string): ParsedRatingWithCount | null {
+  const trimmed = input.trim();
+  if (trimmed.toUpperCase() === "X") return null;
+  const match = trimmed.match(ratingPattern);
+  if (!match) return null;
+  const score = Number(trimmed.split("(")[0].trim());
+  const reviewCount = Number(match[1]);
+  if (!Number.isFinite(score) || !Number.isInteger(reviewCount)) return null;
+  return {
+    value: trimmed,
+    score,
+    reviewCount,
+  };
+}
+
+function parseOrganicPosition(input: string | number | null | undefined) {
+  const text = String(input ?? "").trim();
+  if (!text || text.toUpperCase() === "X") return null;
+  const numeric = Number(text);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return Math.floor(numeric);
+}
+
+type CompMemberMetadata = {
+  starRating: number | null;
+  roomCount: number | null;
+  ratings: {
+    google?: ParsedRatingWithCount;
+    expedia?: ParsedRatingWithCount;
+    booking?: ParsedRatingWithCount;
+    agoda?: ParsedRatingWithCount;
+    priceline?: ParsedRatingWithCount;
+    tripadvisor?: ParsedRatingWithCount;
+  };
+  organicSearchPositions: {
+    expedia: number | null;
+    bookingCom: number | null;
+    priceline: number | null;
+    google: number | null;
+  };
+  otaRatings: Record<string, number>;
+};
+
+function createEmptyCompMemberMetadata(): CompMemberMetadata {
+  return {
+    starRating: null,
+    roomCount: null,
+    ratings: {},
+    organicSearchPositions: {
+      expedia: null,
+      bookingCom: null,
+      priceline: null,
+      google: null,
+    },
+    otaRatings: {},
+  };
+}
+
+function buildCompMemberMetadata(input: {
+  starRating?: number;
+  roomCount?: number;
+  ratings?: CompSetHotelInputRow["ratings"];
+  organicSearchPositions?: CompSetHotelInputRow["organicSearchPositions"];
+}): CompMemberMetadata {
+  const ratings = {
+    google: parseRatingWithCount(input.ratings?.google ?? ""),
+    expedia: parseRatingWithCount(input.ratings?.expedia ?? ""),
+    booking: parseRatingWithCount(input.ratings?.booking ?? ""),
+    agoda: parseRatingWithCount(input.ratings?.agoda ?? ""),
+    priceline: parseRatingWithCount(input.ratings?.priceline ?? ""),
+    tripadvisor: parseRatingWithCount(input.ratings?.tripadvisor ?? ""),
+  };
+
+  return {
+    starRating: Number.isFinite(Number(input.starRating)) ? Number(input.starRating) : null,
+    roomCount: Number.isFinite(Number(input.roomCount)) ? Number(input.roomCount) : null,
+    ratings: {
+      ...(ratings.google ? { google: ratings.google } : {}),
+      ...(ratings.expedia ? { expedia: ratings.expedia } : {}),
+      ...(ratings.booking ? { booking: ratings.booking } : {}),
+      ...(ratings.agoda ? { agoda: ratings.agoda } : {}),
+      ...(ratings.priceline ? { priceline: ratings.priceline } : {}),
+      ...(ratings.tripadvisor ? { tripadvisor: ratings.tripadvisor } : {}),
+    },
+    organicSearchPositions: {
+      expedia: parseOrganicPosition(input.organicSearchPositions?.expedia),
+      bookingCom: parseOrganicPosition(input.organicSearchPositions?.bookingCom),
+      priceline: parseOrganicPosition(input.organicSearchPositions?.priceline),
+      google: parseOrganicPosition(input.organicSearchPositions?.google),
+    },
+    otaRatings: {
+      ...(ratings.google ? { Google: ratings.google.score } : {}),
+      ...(ratings.expedia ? { Expedia: ratings.expedia.score } : {}),
+      ...(ratings.booking ? { Booking: ratings.booking.score } : {}),
+      ...(ratings.agoda ? { Agoda: ratings.agoda.score } : {}),
+      ...(ratings.priceline ? { Priceline: ratings.priceline.score } : {}),
+      ...(ratings.tripadvisor ? { TripAdvisor: ratings.tripadvisor.score } : {}),
+    },
+  };
+}
+
 async function resolveCompHotels(
   compHotels: CompSetHotelInputRow[],
   subjectHotelName: string,
   actorId: string,
 ) {
-  const resolvedCompHotels: Array<{ hotelId: string; otaRatings: Record<string, string | number> }> = [];
+  const resolvedCompHotels: Array<{ hotelId: string; metadata: CompMemberMetadata }> = [];
   const seenHotelIds = new Set<string>();
   const seenNames = new Set<string>();
   const normalizedSubject = subjectHotelName.trim().toLowerCase();
@@ -47,29 +169,26 @@ async function resolveCompHotels(
     if (!dbHotel) {
       dbHotel = await prisma.hotel.create({
         data: {
-          name: comp.hotelName,
+          name: comp.hotelName.trim(),
           profileSource: "AUTO_COMPSET",
           addressLine1: "Unknown",
           city: "Unknown",
           country: "Unknown",
-          websiteUrl: comp.websiteUrl || null,
-          bookingUrl: comp.bookingUrl || null,
-          expediaUrl: comp.expediaLink || null,
+          roomCount: comp.roomCount,
+          starLevel: comp.starRating,
           createdById: actorId,
           updatedById: actorId,
         },
       });
     } else if (
-      (comp.expediaLink?.trim() && comp.expediaLink !== dbHotel.expediaUrl) ||
-      (comp.websiteUrl?.trim() && comp.websiteUrl !== dbHotel.websiteUrl) ||
-      (comp.bookingUrl?.trim() && comp.bookingUrl !== dbHotel.bookingUrl)
+      dbHotel.roomCount !== comp.roomCount ||
+      Number(dbHotel.starLevel ?? 0) !== Number(comp.starRating)
     ) {
       dbHotel = await prisma.hotel.update({
         where: { id: dbHotel.id },
         data: {
-          expediaUrl: comp.expediaLink?.trim() ? comp.expediaLink : dbHotel.expediaUrl,
-          websiteUrl: comp.websiteUrl?.trim() ? comp.websiteUrl : dbHotel.websiteUrl,
-          bookingUrl: comp.bookingUrl?.trim() ? comp.bookingUrl : dbHotel.bookingUrl,
+          roomCount: comp.roomCount,
+          starLevel: comp.starRating,
           updatedById: actorId,
         },
       });
@@ -79,15 +198,14 @@ async function resolveCompHotels(
       continue;
     }
 
-    const otaRatings: Record<string, string | number> = {};
-    for (const [key, value] of Object.entries(comp.otaRatings ?? {})) {
-      if (value === "" || value === null || value === undefined) {
-        continue;
-      }
-      otaRatings[key] = value;
-    }
+    const metadata = buildCompMemberMetadata({
+      starRating: comp.starRating,
+      roomCount: comp.roomCount,
+      ratings: comp.ratings,
+      organicSearchPositions: comp.organicSearchPositions,
+    });
 
-    resolvedCompHotels.push({ hotelId: dbHotel.id, otaRatings });
+    resolvedCompHotels.push({ hotelId: dbHotel.id, metadata });
     seenHotelIds.add(dbHotel.id);
     seenNames.add(normalizedCompName);
   }
@@ -95,40 +213,110 @@ async function resolveCompHotels(
   return resolvedCompHotels;
 }
 
-function serializeCompMemberOtaRatings(otaRatings?: Record<string, string | number>) {
-  const normalizedEntries = Object.entries(otaRatings ?? {}).filter(([, value]) => value !== "" && value !== null && value !== undefined);
-  if (normalizedEntries.length === 0) {
-    return null;
-  }
+function serializeCompMemberMetadata(metadata?: CompMemberMetadata) {
+  if (!metadata) return null;
+  const hasAnyData =
+    metadata.starRating !== null ||
+    metadata.roomCount !== null ||
+    Object.keys(metadata.ratings).length > 0 ||
+    Object.values(metadata.organicSearchPositions).some((value) => value !== null) ||
+    Object.keys(metadata.otaRatings).length > 0;
 
-  return JSON.stringify({
-    otaRatings: Object.fromEntries(normalizedEntries),
-  });
+  if (!hasAnyData) return null;
+  return JSON.stringify(metadata);
 }
 
-export function parseCompMemberOtaRatings(notes: string | null | undefined) {
+function mergeCompMemberMetadata(
+  nextMetadata: CompMemberMetadata,
+  prevMetadata: CompMemberMetadata,
+): CompMemberMetadata {
+  const mergedRatings = {
+    ...prevMetadata.ratings,
+    ...nextMetadata.ratings,
+  };
+  const mergedOtaRatings = {
+    ...prevMetadata.otaRatings,
+    ...nextMetadata.otaRatings,
+  };
+
+  return {
+    starRating:
+      nextMetadata.starRating !== null ? nextMetadata.starRating : prevMetadata.starRating,
+    roomCount:
+      nextMetadata.roomCount !== null ? nextMetadata.roomCount : prevMetadata.roomCount,
+    ratings: mergedRatings,
+    organicSearchPositions: {
+      expedia:
+        nextMetadata.organicSearchPositions.expedia !== null
+          ? nextMetadata.organicSearchPositions.expedia
+          : prevMetadata.organicSearchPositions.expedia,
+      bookingCom:
+        nextMetadata.organicSearchPositions.bookingCom !== null
+          ? nextMetadata.organicSearchPositions.bookingCom
+          : prevMetadata.organicSearchPositions.bookingCom,
+      priceline:
+        nextMetadata.organicSearchPositions.priceline !== null
+          ? nextMetadata.organicSearchPositions.priceline
+          : prevMetadata.organicSearchPositions.priceline,
+      google:
+        nextMetadata.organicSearchPositions.google !== null
+          ? nextMetadata.organicSearchPositions.google
+          : prevMetadata.organicSearchPositions.google,
+    },
+    otaRatings: mergedOtaRatings,
+  };
+}
+
+export function parseCompMemberMetadata(notes: string | null | undefined) {
   if (!notes) {
-    return {};
+    return createEmptyCompMemberMetadata();
   }
 
   try {
-    const parsed = JSON.parse(notes) as { otaRatings?: Record<string, unknown> };
-    const raw = parsed?.otaRatings;
-    if (!raw || typeof raw !== "object") {
-      return {};
-    }
-
-    const result: Record<string, string | number> = {};
-    for (const [key, value] of Object.entries(raw)) {
-      if (typeof value === "number" || typeof value === "string") {
-        result[key] = value;
+    const parsed = JSON.parse(notes) as Partial<CompMemberMetadata> & { otaRatings?: Record<string, unknown> };
+    const rawOtaRatings = parsed.otaRatings ?? {};
+    const otaRatings: Record<string, number> = {};
+    for (const [key, value] of Object.entries(rawOtaRatings)) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        otaRatings[key] = numeric;
       }
     }
 
-    return result;
+    return {
+      starRating: Number.isFinite(Number(parsed.starRating)) ? Number(parsed.starRating) : null,
+      roomCount: Number.isFinite(Number(parsed.roomCount)) ? Number(parsed.roomCount) : null,
+      ratings: {
+        ...(parsed.ratings?.google ? { google: parsed.ratings.google } : {}),
+        ...(parsed.ratings?.expedia ? { expedia: parsed.ratings.expedia } : {}),
+        ...(parsed.ratings?.booking ? { booking: parsed.ratings.booking } : {}),
+        ...(parsed.ratings?.agoda ? { agoda: parsed.ratings.agoda } : {}),
+        ...(parsed.ratings?.priceline ? { priceline: parsed.ratings.priceline } : {}),
+        ...(parsed.ratings?.tripadvisor ? { tripadvisor: parsed.ratings.tripadvisor } : {}),
+      },
+      organicSearchPositions: {
+        expedia: Number.isFinite(Number(parsed.organicSearchPositions?.expedia))
+          ? Number(parsed.organicSearchPositions?.expedia)
+          : null,
+        bookingCom: Number.isFinite(Number(parsed.organicSearchPositions?.bookingCom))
+          ? Number(parsed.organicSearchPositions?.bookingCom)
+          : null,
+        priceline: Number.isFinite(Number(parsed.organicSearchPositions?.priceline))
+          ? Number(parsed.organicSearchPositions?.priceline)
+          : null,
+        google: Number.isFinite(Number(parsed.organicSearchPositions?.google))
+          ? Number(parsed.organicSearchPositions?.google)
+          : null,
+      },
+      otaRatings,
+    };
   } catch {
-    return {};
+    return createEmptyCompMemberMetadata();
   }
+}
+
+export function parseCompMemberOtaRatings(notes: string | null | undefined) {
+  return parseCompMemberMetadata(notes).otaRatings;
 }
 
 export async function listCompSets() {
@@ -210,11 +398,11 @@ export async function createCompSet(
             roleType: HotelRoleType.SUBJECT,
             displayOrder: 0,
           },
-          ...resolvedCompHotels.map(({ hotelId, otaRatings }, index) => ({
+          ...resolvedCompHotels.map(({ hotelId, metadata }, index) => ({
             hotelId,
             roleType: HotelRoleType.COMP,
             displayOrder: index + 1,
-            notes: serializeCompMemberOtaRatings(otaRatings),
+            notes: serializeCompMemberMetadata(metadata),
           })),
         ],
       },
@@ -254,6 +442,12 @@ export async function updateCompSet(
           name: true,
         },
       },
+      members: {
+        select: {
+          hotelId: true,
+          notes: true,
+        },
+      },
     },
   });
 
@@ -261,11 +455,25 @@ export async function updateCompSet(
     throw new Error("Changing the main property is not supported when editing a compset.");
   }
 
-  const resolvedCompHotels = await resolveCompHotels(
+  const resolvedCompHotelsRaw = await resolveCompHotels(
     parsed.compHotels,
     existingCompSet.subjectHotel.name,
     actorId,
   );
+  const previousMetadataByHotelId = new Map(
+    existingCompSet.members.map((member) => [
+      member.hotelId,
+      parseCompMemberMetadata(member.notes),
+    ]),
+  );
+  const resolvedCompHotels = resolvedCompHotelsRaw.map((row) => {
+    const prev = previousMetadataByHotelId.get(row.hotelId);
+    if (!prev) return row;
+    return {
+      ...row,
+      metadata: mergeCompMemberMetadata(row.metadata, prev),
+    };
+  });
   if (resolvedCompHotels.length === 0) {
     throw new Error("At least one competitor different from the main property is required.");
   }
@@ -291,12 +499,12 @@ export async function updateCompSet(
           roleType: HotelRoleType.SUBJECT,
           displayOrder: 0,
         },
-        ...resolvedCompHotels.map(({ hotelId, otaRatings }, index) => ({
+        ...resolvedCompHotels.map(({ hotelId, metadata }, index) => ({
           compSetId,
           hotelId,
           roleType: HotelRoleType.COMP,
           displayOrder: index + 1,
-          notes: serializeCompMemberOtaRatings(otaRatings),
+          notes: serializeCompMemberMetadata(metadata),
         })),
       ],
     });
@@ -432,7 +640,13 @@ export async function runDraftCompetitorWebsiteAudits(
   },
   actorId: string,
 ) {
-  const rows = input.compHotels.map((row) => compsetHotelRowSchema.parse(row));
+  const draftAuditRowSchema = z.object({
+    hotelName: z.string().min(1),
+    websiteUrl: z.string().optional().or(z.literal("")),
+    bookingUrl: z.string().optional().or(z.literal("")),
+    expediaLink: z.string().optional().or(z.literal("")),
+  });
+  const rows = input.compHotels.map((row) => draftAuditRowSchema.parse(row));
   const deduped = new Map<string, (typeof rows)[number]>();
 
   for (const row of rows) {

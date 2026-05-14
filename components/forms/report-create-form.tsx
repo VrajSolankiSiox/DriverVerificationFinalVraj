@@ -91,6 +91,7 @@ export function ReportCreateForm({
       hotelId: string;
       roleType: "SUBJECT" | "COMP";
       hotel: { name: string };
+      hasSeo?: boolean;
     }>;
   }>;
   uploads: Array<{
@@ -137,6 +138,8 @@ export function ReportCreateForm({
     initialUploadBatchId ? "UPLOAD" : "MANUAL",
   );
   const [manualRows, setManualRows] = useState<ManualRateRow[]>([]);
+  const [includeSeoComparison, setIncludeSeoComparison] = useState(true);
+  const [seoWarning, setSeoWarning] = useState<string | null>(null);
 
   const selectedCompSet =
     compsets.find((item) => item.id === compSetId) ?? null;
@@ -258,6 +261,7 @@ export function ReportCreateForm({
       onSubmit={async (event) => {
         event.preventDefault();
         setError(null);
+        setSeoWarning(null);
 
         const formData = new FormData(event.currentTarget);
         const reportName = String(formData.get("name") ?? "").trim();
@@ -278,7 +282,22 @@ export function ReportCreateForm({
           subjectHotelId,
           compSetId,
           dataSource,
+          includeSeoComparison,
         };
+
+        if (includeSeoComparison) {
+          const members = selectedCompSet?.members ?? [];
+          const withSeo = members.filter((member) => member.hasSeo).length;
+          const withoutSeo = Math.max(members.length - withSeo, 0);
+
+          if (members.length > 0 && withSeo > 0 && withoutSeo > 0) {
+            setSeoWarning(
+              `SEO data is mixed for this compset (${withSeo} with SEO, ${withoutSeo} without). Report will include SEO comparison only for available hotels.`,
+            );
+          } else if (members.length > 0 && withSeo === 0) {
+            setSeoWarning("No hotels in this compset currently have SEO data. SEO section will be disabled for this report.");
+          }
+        }
 
         if (dataSource === "UPLOAD") {
           payload.uploadBatchId = uploadBatchId;
@@ -348,6 +367,9 @@ export function ReportCreateForm({
         if (!response.ok) {
           setError(result.error || "Failed to create report.");
           return;
+        }
+        if (result.warning) {
+          setSeoWarning(String(result.warning));
         }
         router.push(`/reports/${result.id}`);
         router.refresh();
@@ -420,6 +442,18 @@ export function ReportCreateForm({
             <option value="">No compsets available</option>
           )}
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Optional metrics</Label>
+        <label className="flex items-center gap-2 text-sm rounded-md border p-3">
+          <input
+            type="checkbox"
+            checked={includeSeoComparison}
+            onChange={(event) => setIncludeSeoComparison(event.target.checked)}
+          />
+          Include SEO comparison (only where data is available)
+        </label>
       </div>
 
       <div className="space-y-2">
@@ -604,6 +638,7 @@ export function ReportCreateForm({
       )}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {seoWarning ? <p className="text-sm text-amber-700">{seoWarning}</p> : null}
       <Button
         type="submit"
         disabled={

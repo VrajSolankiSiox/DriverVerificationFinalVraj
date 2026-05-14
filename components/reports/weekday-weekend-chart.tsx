@@ -1,6 +1,15 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { formatCurrency } from "@/lib/utils";
 
@@ -10,68 +19,47 @@ export function WeekdayWeekendChart({
   data: Array<{ label: string; subject: number; comp: number }>;
 }) {
   return (
-    <div className="h-72 w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-blue-100/60 p-2">
+    <div className="h-72 w-full rounded-md border border-slate-100 bg-white p-3">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          layout="vertical"
-          barCategoryGap="28%"
-          margin={{ top: 8, right: 24, bottom: 8, left: 8 }}
-        >
+        <BarChart data={data} barGap={12} barCategoryGap="26%" margin={{ top: 14, right: 18, bottom: 6, left: 0 }}>
           <defs>
-            <linearGradient id="weekdayWeekendSubject" x1="0" y1="0" x2="1" y2="0">
+            <linearGradient id="weekdayWeekendSubject" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#1d4ed8" />
-              <stop offset="100%" stopColor="#2563eb" />
+              <stop offset="100%" stopColor="#1e3a8a" />
             </linearGradient>
-            <linearGradient id="weekdayWeekendComp" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#60a5fa" />
-              <stop offset="100%" stopColor="#93c5fd" />
+            <linearGradient id="weekdayWeekendComp" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#93c5fd" />
+              <stop offset="100%" stopColor="#60a5fa" />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#bfdbfe" strokeDasharray="4 5" horizontal={false} />
-          <XAxis
-            type="number"
-            tickFormatter={(value) => formatCurrency(Number(value))}
-            tick={{ fill: "#1e3a8a", fontSize: 12 }}
-            axisLine={{ stroke: "#93c5fd" }}
-            tickLine={{ stroke: "#93c5fd" }}
-          />
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 6" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: "#475569", fontSize: 12 }} tickLine={false} axisLine={false} />
           <YAxis
-            type="category"
-            dataKey="label"
-            width={88}
-            tick={{ fill: "#1e40af", fontSize: 13, fontWeight: 600 }}
-            axisLine={false}
+            tickFormatter={(value) => `$${value}`}
+            tick={{ fill: "#475569", fontSize: 12 }}
             tickLine={false}
+            axisLine={false}
+            width={46}
           />
           <Tooltip
             formatter={(value) => formatCurrency(Number(value))}
+            labelStyle={{ color: "#0f172a", fontWeight: 700 }}
             contentStyle={{
-              borderRadius: "0.75rem",
-              border: "1px solid #bfdbfe",
-              backgroundColor: "#ffffff",
+              borderRadius: "8px",
+              border: "1px solid #dbeafe",
+              background: "rgba(255,255,255,0.98)",
+              boxShadow: "0 14px 30px -20px rgba(15,23,42,0.18)",
             }}
-            itemStyle={{ color: "#1e3a8a" }}
-            labelStyle={{ color: "#1e40af", fontWeight: 600 }}
-            cursor={{ fill: "#dbeafe" }}
+            cursor={{ fill: "rgba(219,234,254,0.35)" }}
           />
-          <Legend />
-          <Bar
-            dataKey="subject"
-            name="Subject"
-            fill="url(#weekdayWeekendSubject)"
-            radius={[0, 10, 10, 0]}
-            barSize={16}
-            activeBar={{ fill: "url(#weekdayWeekendSubject)", stroke: "#1d4ed8", strokeWidth: 1 }}
+          <Legend
+            verticalAlign="top"
+            height={28}
+            iconType="circle"
+            wrapperStyle={{ fontSize: "12px", color: "#475569", paddingBottom: "8px" }}
           />
-          <Bar
-            dataKey="comp"
-            name="Comp Avg"
-            fill="url(#weekdayWeekendComp)"
-            radius={[0, 10, 10, 0]}
-            barSize={16}
-            activeBar={{ fill: "url(#weekdayWeekendComp)", stroke: "#60a5fa", strokeWidth: 1 }}
-          />
+          <Bar dataKey="subject" name="Subject" fill="url(#weekdayWeekendSubject)" radius={[6, 6, 2, 2]} />
+          <Bar dataKey="comp" name="Comp Avg" fill="url(#weekdayWeekendComp)" radius={[6, 6, 2, 2]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -4,6 +4,13 @@ import type { ReportViewModel } from "@/lib/reports/sections";
 export type AlertMetric = "RATE_GAP" | "WEBSITE_SCORE" | "REVIEW_RANK" | "SEO_SCORE";
 
 export async function evaluateAlerts(reportId: string, viewModel: ReportViewModel) {
+  await prisma.alert.deleteMany({
+    where: {
+      reportId,
+      acknowledgedAt: null,
+    },
+  });
+
   const alerts: Array<{ metric: AlertMetric; message: string; severity: "INFO" | "WARNING" | "CRITICAL" }> = [];
   const summary90 = viewModel.analytics.summariesByWindow["90"];
   const compCount = viewModel.compSet.members.filter((m) => m.roleType === "COMP").length;
@@ -26,8 +33,9 @@ export async function evaluateAlerts(reportId: string, viewModel: ReportViewMode
     });
   }
 
+  const seoEnabledForReport = viewModel.includeSeoComparison !== false;
   const seoScore = viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total;
-  if (seoScore != null && seoScore < 60) {
+  if (seoEnabledForReport && seoScore != null && seoScore < 60) {
     alerts.push({
       metric: "SEO_SCORE",
       message: `SEO score ${seoScore}/100—your site is invisible where comps rank.`,

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export default async function NewCompSetPage() {
   const hotels = await prisma.hotel.findMany({
+    where: { profileSource: "MANUAL" },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

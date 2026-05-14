@@ -1,12 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { logActivity } from "@/lib/activity-log";
-import { scrapeTripAdvisor } from "@/lib/reviews/scrapers/tripadvisor";
 import { scrapeGoogle } from "@/lib/reviews/scrapers/google";
 import type { ReviewSource } from "@/lib/reviews/types";
 
 const scrapers: Record<ReviewSource, (hotel: { name: string; city: string; websiteUrl?: string | null }) => Promise<{ source: ReviewSource; averageRating: number; reviewCount: number; capturedAt: Date } | null>> = {
-  TRIPADVISOR: scrapeTripAdvisor,
   GOOGLE: scrapeGoogle,
   EXPEDIA: async () => null,
   BOOKING: async () => null,

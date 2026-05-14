@@ -12,6 +12,7 @@ export const reportCreateSchema = z
     subjectHotelId: z.string().min(1),
     compSetId: z.string().min(1),
     dataSource: z.enum(["UPLOAD", "MANUAL"]).default("UPLOAD"),
+    includeSeoComparison: z.boolean().optional().default(true),
     uploadBatchId: z.string().optional(),
     manualRates: z.array(manualRateInputSchema).optional(),
   })
@@ -38,9 +39,6 @@ export const reportCreateSchema = z
 
 export const reportUpdateSchema = z.object({
   reportId: z.string().min(1),
-  executiveSummary: z.string().optional().nullable(),
-  manualOpportunityNotes: z.string().optional().nullable(),
-  methodologyNote: z.string().optional().nullable(),
   status: z.enum(["DRAFT", "REVIEW_READY", "APPROVED", "EXPORTED"]).optional(),
   sectionOrder: z.array(z.object({
     id: z.string().min(1),

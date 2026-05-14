@@ -15,6 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       {
         uploadBatchId: id,
         year: Number.isFinite(year) ? year : undefined,
+        autoAddUnresolvedHotels: false,
       },
       user.id,
     );
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await importUploadBatch(
       {
         uploadBatchId: id,
-        mode: batch.importMode,
+        mode: batch.importMode === "APPEND_NEW" ? "APPEND_NEW" : "APPEND_NEW",
       },
       user.id,
     );

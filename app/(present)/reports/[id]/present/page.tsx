@@ -1,18 +1,40 @@
+import { CompetitiveGapsGrid } from "@/components/reports/competitive-gaps-grid";
+import { OtaRatingComparisonChart } from "@/components/reports/ota-rating-comparison-chart";
+import { OwnerFeedbackSlide } from "@/components/reports/owner-feedback-slide";
 import { PresentationView } from "@/components/reports/presentation-view";
+import { RankDistributionChart } from "@/components/reports/rank-distribution-chart";
+import { RateIndexChart } from "@/components/reports/rate-index-chart";
+import { ReviewResponseGallery } from "@/components/reports/review-response-gallery";
+import { RateTrendPanels } from "@/components/reports/rate-trend-panels";
+import { WeekdayWeekendChart } from "@/components/reports/weekday-weekend-chart";
+import { WebsiteScoreCards } from "@/components/reports/website-score-cards";
 import { buildCompetitiveGaps } from "@/lib/reports/competitive-gaps";
 import { buildReportViewModel } from "@/lib/services/reports";
+import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 const talkingPoints: Record<string, string> = {
-  cover: "Introduce the report. Internal analysis for client-safe presentation.",
-  summary: "Lead with the rate metrics. You're $X below comps—that's measurable revenue left on the table.",
-  gaps: "Here's where you're losing. Let's dig in. Lead with the strongest gap.",
-  compset: "This is your compset. We compare you against these properties.",
-  pricing: "You're underpricing on X nights. Comps are capturing more. What's your strategy?",
-  website: "Your site scores X vs comps at 85. Guests are bouncing to competitors.",
-  actions: "Here's what to do first. We can help operationalize.",
-  methodology: "This is outside-in observation, not a revenue claim. Close with: What's the one thing you'd fix first?",
+  cover: "Frame the narrative: this is an outside-in competitive read, not an internal revenue claim.",
+  summary: "Open with the biggest deltas and show how pricing posture compares with the market.",
+  pricingTrends: "Show whether under- or over-positioning is persistent and where competitors separate.",
+  rateIndex: "Use rate index to explain premium versus discount posture through time.",
+  compSnapshot: "Highlight where the subject wins and where visible gaps require action.",
+  mixAndRank: "Use these distributions to explain how often the subject truly leads or trails.",
+  website: "Connect website quality to rate and conversion narrative.",
+  ota: "Show platform-by-platform reputation pressure versus competitors.",
+  reviewResponses: "Use visual proof of response activity to support the reputation management narrative.",
+  actions: "End with a practical action sequence tied to observed gaps.",
 };
+
+function parseOtaScore(value: string | number | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const match = text.match(/^([0-9]+(?:\.[0-9]+)?)/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export default async function ReportPresentPage({
   params,
@@ -24,147 +46,319 @@ export default async function ReportPresentPage({
   const { id } = await params;
   const { demo } = await searchParams;
   const isDemoMode = demo === "1" || demo === "true";
+
   const viewModel = await buildReportViewModel(id);
+
+  // Fetch linked demo session for owner feedback
+  const linkedDemo = await prisma.demoSession.findFirst({
+    where: {
+      OR: [
+        { reportId: id },
+        { hotelId: viewModel.subjectHotel.id },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, ownerFeedback: true },
+  });
   const summary90 = viewModel.analytics.summariesByWindow["90"];
   const compCount = viewModel.compSet.members.filter((m) => m.roleType === "COMP").length;
+  const hasWebsiteData = viewModel.websiteAudit?.scoreTotal != null;
+  const hasSeoData =
+    viewModel.includeSeoComparison &&
+    (viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null) != null;
+
   const competitiveGaps = buildCompetitiveGaps(
     viewModel.analytics,
     viewModel.websiteAudit?.scoreTotal ?? null,
     compCount,
     {
-      seoScore: viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null,
+      seoScore: viewModel.includeSeoComparison
+        ? (viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null)
+        : null,
       reviewSubject: viewModel.reviewSnapshots?.subject,
       reviewComps: viewModel.reviewSnapshots?.comps,
     },
   );
 
+  const visibleCompetitiveGaps = competitiveGaps.filter((gap) => {
+    if (gap.metric === "Website score" && (!hasWebsiteData || !viewModel.includeSeoComparison)) {
+      return false;
+    }
+    if (gap.metric === "SEO" && !hasSeoData) {
+      return false;
+    }
+    return true;
+  });
+
+  const weekdayWeekendData = [
+    {
+      label: "Weekday",
+      subject: viewModel.analytics.weekdayWeekend.weekdaySubjectAverage,
+      comp: viewModel.analytics.weekdayWeekend.weekdayCompAverage,
+    },
+    {
+      label: "Weekend",
+      subject: viewModel.analytics.weekdayWeekend.weekendSubjectAverage,
+      comp: viewModel.analytics.weekdayWeekend.weekendCompAverage,
+    },
+  ];
+
+  const normalizeHotelName = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const normalizedSubjectName = normalizeHotelName(viewModel.subjectHotel.name);
+  const subjectOtaRatings: Record<string, number> = {};
+
+  for (const [key, value] of Object.entries(viewModel.subjectHotel.otaRatings ?? {})) {
+    const num = parseOtaScore(value);
+    if (num !== null) subjectOtaRatings[key] = num;
+  }
+
+  for (const [key, value] of Object.entries(viewModel.compSet.subjectOtaRatings ?? {})) {
+    if (subjectOtaRatings[key] === undefined) {
+      const num = parseOtaScore(value);
+      if (num !== null) subjectOtaRatings[key] = num;
+    }
+  }
+
+  const otaCompetitors = viewModel.compSet.members
+    .filter((member) => member.roleType === "COMP" && normalizeHotelName(member.name) !== normalizedSubjectName)
+    .map((member) => {
+      const ratings: Record<string, number> = {};
+      for (const [key, value] of Object.entries(member.otaRatings ?? {})) {
+        const num = parseOtaScore(value);
+        if (num !== null) ratings[key] = num;
+      }
+      return { name: member.name, ratings };
+    });
+
+  const subjectLikeComp = viewModel.compSet.members.find(
+    (member) => member.roleType === "COMP" && normalizeHotelName(member.name) === normalizedSubjectName,
+  );
+  if (subjectLikeComp?.otaRatings) {
+    for (const [key, value] of Object.entries(subjectLikeComp.otaRatings)) {
+      if (subjectOtaRatings[key] === undefined) {
+        const num = parseOtaScore(value);
+        if (num !== null) subjectOtaRatings[key] = num;
+      }
+    }
+  }
+
+  const otaComparisonData = {
+    subjectRatings: subjectOtaRatings,
+    competitors: otaCompetitors,
+    subjectName: viewModel.subjectHotel.name,
+  };
+  const reviewResponseScreenshotsByHotel = viewModel.comparisonDataset?.reviewResponseScreenshotsByHotel ?? {};
+  const reviewResponseHotels = [
+    {
+      hotelId: viewModel.subjectHotel.id,
+      hotelName: viewModel.subjectHotel.name,
+      screenshots: reviewResponseScreenshotsByHotel[viewModel.subjectHotel.id] ?? [],
+    },
+  ];
+
+  const abovePct = summary90.nights ? Math.round((summary90.aboveThresholdCount / summary90.nights) * 100) : 0;
+  const belowPct = summary90.nights ? Math.round((summary90.belowThresholdCount / summary90.nights) * 100) : 0;
+
   const slides = [
     {
       id: "cover",
-      title: "Cover",
+      title: "Report Introduction",
       body: (
-        <div className="flex h-full flex-col justify-center">
-          <h1 className="text-5xl font-semibold tracking-tight">{viewModel.reportName}</h1>
-          <p className="mt-4 text-2xl text-slate-600">{viewModel.subjectHotel.name} • {viewModel.subjectHotel.city}, {viewModel.subjectHotel.country}</p>
-          <p className="mt-6 max-w-3xl text-lg text-slate-500">Internal analysis assembled for client-safe presentation. Publicly observed rates and first-party website data only.</p>
+        <div className="grid h-full gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-6">
+            <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+              Premium Presentation
+            </span>
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">{viewModel.reportName}</h1>
+            <p className="text-lg text-slate-700">{viewModel.subjectHotel.name} | {viewModel.subjectHotel.city}, {viewModel.subjectHotel.country}</p>
+            <p className="max-w-3xl text-base leading-7 text-slate-600">
+              Executive-ready competitive analysis based on observed market rates and first-party digital signals.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Story Focus</p>
+            <ul className="mt-4 space-y-3 text-sm text-slate-700">
+              <li>Rate posture vs compset across observed dates</li>
+              <li>Where the subject consistently wins or lags</li>
+              <li>Website and OTA pressure points shaping demand choice</li>
+              <li>Prioritized 30/60/90 day commercial actions</li>
+            </ul>
+          </div>
         </div>
       ),
+      takeaway: "This deck translates the existing report data into an executive narrative with one decision-oriented message per slide.",
     },
     {
       id: "summary",
       title: "Executive Summary",
       body: (
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Avg Subject Rate</div><div className="mt-2 text-3xl font-semibold">{formatCurrency(summary90.avgSubjectRate)}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Avg Comp Average</div><div className="mt-2 text-3xl font-semibold">{formatCurrency(summary90.avgCompAverageRate)}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Rate Index</div><div className="mt-2 text-3xl font-semibold">{formatNumber(summary90.avgRateIndex, 2)}</div></div>
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-blue-700">Avg Subject Rate</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{formatCurrency(summary90.avgSubjectRate)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Avg Comp Rate</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{formatCurrency(summary90.avgCompAverageRate)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Rate Index</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{formatNumber(summary90.avgRateIndex, 2)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Median Gap</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{formatCurrency(summary90.medianGap)}</p>
+            </div>
           </div>
-          <p className="max-w-4xl text-lg text-slate-700">{viewModel.manualExecutiveSummary ?? "Publicly observed rate positioning suggests a meaningful commercial conversation around pricing stance, website merchandising, and direct booking conversion."}</p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm leading-7 text-slate-700">
+              Observed pricing and digital performance indicate a measurable positioning gap, with clear opportunities across rate strategy and direct demand conversion.
+            </p>
+          </div>
         </div>
       ),
+      takeaway: `The subject sits below comp average on ${belowPct}% of observed nights, signaling a consistent value-positioning posture.`,
     },
     {
-      id: "gaps",
-      title: "Where You're Losing",
+      id: "pricingTrends",
+      title: "Rate Trend and Competitor Comparison",
       body: (
-        <div className="space-y-4">
-          <p className="text-lg text-slate-600">Competitive gaps across rate, website, reviews, and SEO.</p>
-          <div className="grid gap-4 md:grid-cols-2">
-            {competitiveGaps.map((g) => (
-              <div
-                key={g.metric}
-                className={`rounded-xl border p-5 ${g.verdict.includes("Leaving") || g.verdict.includes("bouncing") ? "border-amber-300 bg-amber-50" : "border-slate-200"}`}
-              >
-                <div className="text-sm uppercase tracking-wide text-slate-500">{g.metric}</div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-semibold">{g.subjectValue}</span>
-                  {g.compAverage != null && <span className="text-slate-600">vs {g.compAverage}</span>}
-                </div>
-                {g.rank != null && <div className="mt-1 text-sm text-slate-600">{g.rank}</div>}
-                <div className={`mt-2 font-medium ${g.verdict.includes("Leaving") || g.verdict.includes("bouncing") ? "text-amber-700" : "text-slate-700"}`}>{g.verdict}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <RateTrendPanels
+          ratePositionData={viewModel.analytics.daily}
+          hotelRateData={viewModel.hotelRateSeries?.points ?? []}
+          hotelRateLines={viewModel.hotelRateSeries?.lines ?? []}
+        />
       ),
+      takeaway: "Trend lines show whether pricing gaps are episodic or structural, helping prioritize tactical versus systemic response.",
     },
     {
-      id: "compset",
-      title: "CompSet Overview",
-      body: (
-        <div className="space-y-4">
-          <h2 className="text-3xl font-semibold">{viewModel.compSet.name}</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {viewModel.compSet.members.map((member) => (
-              <div key={member.id} className="rounded-xl border p-5">
-                <div className="text-sm uppercase tracking-wide text-slate-500">{member.roleType}</div>
-                <div className="mt-2 text-2xl font-semibold">{member.name}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "pricing",
-      title: "Pricing Positioning",
+      id: "rateIndex",
+      title: "Rate Index Performance",
       body: (
         <div className="space-y-6">
+          <RateIndexChart
+            data={viewModel.analytics.daily.map((row) => ({
+              date: row.date,
+              rateIndex: row.rateIndex,
+            }))}
+          />
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Below Comp Avg</div><div className="mt-2 text-4xl font-semibold">{summary90.belowThresholdCount}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Above Comp Avg</div><div className="mt-2 text-4xl font-semibold">{summary90.aboveThresholdCount}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Lowest-Priced Nights</div><div className="mt-2 text-4xl font-semibold">{summary90.subjectLowestCount}</div></div>
-          </div>
-          <div className="rounded-xl border p-6">
-            <h3 className="text-xl font-semibold">Key interpretation</h3>
-            <p className="mt-3 text-lg text-slate-700">Across the observed 90-day window, the subject property priced below the compset average on {summary90.belowThresholdCount} of {summary90.nights} nights. This is framed as an outside-in pricing observation, not a revenue or occupancy claim.</p>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Below Comp Avg Nights</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{summary90.belowThresholdCount}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Above Comp Avg Nights</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{summary90.aboveThresholdCount}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Lowest-Priced Nights</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{summary90.subjectLowestCount}</p>
+            </div>
           </div>
         </div>
       ),
+      takeaway: `The subject is above comp average on ${abovePct}% of nights, showing limited premium positioning periods.`,
+    },
+    {
+      id: "compSnapshot",
+      title: "Competitive Gap Snapshot",
+      body: (
+        <div className="space-y-5">
+          <CompetitiveGapsGrid gaps={visibleCompetitiveGaps} />
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            Subject hotel: <span className="font-semibold text-blue-700">{viewModel.subjectHotel.name}</span> compared against <span className="font-semibold">{compCount}</span> competitors in {viewModel.compSet.name}.
+          </div>
+        </div>
+      ),
+      takeaway: "The snapshot isolates the most visible performance gaps so leadership can focus on high-impact fixes first.",
+    },
+    {
+      id: "mixAndRank",
+      title: "Weekday/Weekend and Rating Distribution",
+      body: (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <WeekdayWeekendChart data={weekdayWeekendData} />
+          <RankDistributionChart distribution={viewModel.analytics.rankDistribution} />
+        </div>
+      ),
+      takeaway: "Segment and distribution views reveal when the subject competes effectively and where positioning consistency breaks down.",
     },
     {
       id: "website",
-      title: "Website Audit",
-      body: (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Total Score</div><div className="mt-2 text-4xl font-semibold">{viewModel.websiteAudit?.scoreTotal ?? "—"}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Direct Booking UX</div><div className="mt-2 text-4xl font-semibold">{viewModel.websiteAudit?.directBookingUxScore ?? "—"}</div></div>
-            <div className="rounded-xl border p-6"><div className="text-sm text-slate-500">Technical Hygiene</div><div className="mt-2 text-4xl font-semibold">{viewModel.websiteAudit?.technicalHygieneScore ?? "—"}</div></div>
-          </div>
-          <ul className="list-disc space-y-2 pl-6 text-lg text-slate-700">
-            {(viewModel.websiteAudit?.notes ?? ["Website audit has not been run yet."]).map((note) => <li key={note}>{note}</li>)}
-          </ul>
-        </div>
-      ),
+      title: "Website Audit Signals",
+      body: <WebsiteScoreCards audit={viewModel.websiteAudit} />,
+      takeaway: "Digital experience signals complement pricing insights by showing how effectively direct demand can be captured.",
+    },
+    {
+      id: "ota",
+      title: "OTA Reputation Comparison",
+      body: <OtaRatingComparisonChart data={otaComparisonData} />,
+      takeaway: "Platform-level reputation pressure indicates where guest perception may be influencing competitive conversion outcomes.",
+    },
+    {
+      id: "reviewResponses",
+      title: "Review Response Evidence",
+      body: <ReviewResponseGallery hotels={reviewResponseHotels} />,
+      takeaway: "Response screenshots show where engagement is visible and where response presence is missing by platform.",
     },
     {
       id: "actions",
-      title: "Recommended Actions",
+      title: "Prioritized Action Plan",
       body: (
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border p-6"><h3 className="text-2xl font-semibold">30 Days</h3><ul className="mt-4 list-disc space-y-2 pl-6 text-slate-700"><li>Validate low-position pricing guardrails.</li><li>Tighten booking CTA placement.</li><li>Expose commercial offers more clearly.</li></ul></div>
-          <div className="rounded-xl border p-6"><h3 className="text-2xl font-semibold">60 Days</h3><ul className="mt-4 list-disc space-y-2 pl-6 text-slate-700"><li>Refine weekday vs weekend merchandising.</li><li>Formalize near-term market review cadence.</li><li>Close technical hygiene gaps.</li></ul></div>
-          <div className="rounded-xl border p-6"><h3 className="text-2xl font-semibold">90 Days</h3><ul className="mt-4 list-disc space-y-2 pl-6 text-slate-700"><li>Operationalize cross-functional workflow.</li><li>Track conversion lift.</li><li>Increase observation granularity.</li></ul></div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">30 Days</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+              <li>Recalibrate low-position guardrails on high-demand nights.</li>
+              <li>Strengthen booking CTA visibility on primary pages.</li>
+              <li>Align visible offers with key comp pressure windows.</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">60 Days</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+              <li>Tune weekday/weekend merchandising by observed pattern.</li>
+              <li>Formalize weekly compset pricing review cadence.</li>
+              <li>Resolve core website technical hygiene issues.</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">90 Days</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+              <li>Integrate commercial, marketing, and digital workflows.</li>
+              <li>Track conversion movement against pricing changes.</li>
+              <li>Increase market observation depth where variance is highest.</li>
+            </ul>
+          </div>
         </div>
       ),
+      takeaway: "A phased action plan turns observed gaps into an operational roadmap with immediate and medium-term wins.",
     },
     {
-      id: "methodology",
-      title: "Methodology",
+      id: "ownerFeedback",
+      title: "Owner Feedback",
       body: (
-        <div className="max-w-4xl space-y-4 text-lg text-slate-700">
-          <p>{viewModel.methodologyNote}</p>
-          <p>This analysis does not claim actual hotel revenue, occupancy, or market share. It summarizes uploaded market observations and first-party website signals available at the time of analysis.</p>
-        </div>
+        <OwnerFeedbackSlide
+          reportId={id}
+          demoId={linkedDemo?.id ?? null}
+          initialFeedback={linkedDemo?.ownerFeedback ?? null}
+          hotelName={viewModel.subjectHotel.name}
+        />
       ),
+      takeaway: "Capture the hotel owner's reaction, objections, and next steps directly from the presentation.",
     },
   ];
 
-  const slidesWithNotes = slides.map((s) => ({
-    ...s,
-    talkingPoint: talkingPoints[s.id] ?? "",
+  const slidesWithNotes = slides.map((slide) => ({
+    ...slide,
+    talkingPoint: talkingPoints[slide.id] ?? "",
   }));
 
   return <PresentationView slides={slidesWithNotes} demoMode={isDemoMode} />;

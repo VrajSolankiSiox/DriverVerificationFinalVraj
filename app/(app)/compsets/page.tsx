@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Building2, Users, ArrowUpRight, Layers3 } from "lucide-react";
+import { Plus, Building2, Users, Layers3, EllipsisVertical, Eye, PencilLine } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ export default async function CompSetsPage() {
       )}
 
       {/* Table */}
-      <Card className="rounded-2xl border-muted/50 shadow-md rounded-md ">
+      <Card className="overflow-visible rounded-2xl rounded-md border-muted/50 shadow-md">
         <CardHeader className="border-b bg-white flex items-center flex-row justify-between  rounded-md">
           <div className="flex">
             <CardTitle>CompSet Directory</CardTitle>
@@ -89,7 +89,7 @@ export default async function CompSetsPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="overflow-visible p-0">
           {compsets.length ? (
             <Table>
               <TableHeader>
@@ -97,7 +97,7 @@ export default async function CompSetsPage() {
                   <TableHead className="pl-6">Name</TableHead>
                   <TableHead>Main Property</TableHead>
                   <TableHead>Members</TableHead>
-                  <TableHead className="w-[80px]" />
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -134,13 +134,28 @@ export default async function CompSetsPage() {
                       </Badge>
                     </TableCell>
 
-                    <TableCell>
-                      <Link
-                        href={`/compsets/${compSet.id}`}
-                        className="inline-flex items-center text-muted-foreground hover:text-primary"
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Link>
+                    <TableCell className="text-right">
+                      <details name="compset-actions-menu" className="relative inline-block">
+                        <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground">
+                          <EllipsisVertical className="h-4 w-4" />
+                        </summary>
+                        <div className="absolute right-0 z-50 mt-1 min-w-[140px] rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                          <Link
+                            href={`/compsets/${compSet.id}`}
+                            className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Link>
+                          <Link
+                            href={`/compsets/${compSet.id}/edit`}
+                            className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                          >
+                            <PencilLine className="h-4 w-4" />
+                            Edit
+                          </Link>
+                        </div>
+                      </details>
                     </TableCell>
                   </TableRow>
                 ))}

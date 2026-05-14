@@ -26,6 +26,8 @@ export type DailyPositioning = {
   rateIndex: number | null;
   subjectRank: "LOWEST" | "MIDDLE" | "HIGHEST" | "MISSING";
   compCount: number;
+  subjectSoldOut: boolean;
+  allCompsSoldOut: boolean;
 };
 
 export type RateAnalyticsResult = {
@@ -78,13 +80,22 @@ export type RateAnalyticsResult = {
 function latestByHotelDate(observations: AnalyticsObservation[]) {
   const map = new Map<string, AnalyticsObservation>();
   for (const observation of observations) {
-    const key = `${observation.hotelId}|${format(observation.stayDate, "yyyy-MM-dd")}`;
+    const key = `${observation.hotelId}|${toDateKey(observation.stayDate)}`;
     const existing = map.get(key);
     if (!existing || existing.captureDate < observation.captureDate) {
       map.set(key, observation);
     }
   }
   return [...map.values()];
+}
+
+function toDateKey(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function isSoldOut(status?: string | null) {
+  const s = String(status ?? "").toLowerCase();
+  return s.includes("sold_out") || s.includes("sold out");
 }
 
 export function computeRateAnalytics(
@@ -96,21 +107,29 @@ export function computeRateAnalytics(
   const byDate = new Map<string, AnalyticsObservation[]>();
 
   for (const observation of latest) {
-    const key = format(startOfDay(observation.stayDate), "yyyy-MM-dd");
+    const key = toDateKey(observation.stayDate);
     const current = byDate.get(key) ?? [];
     current.push(observation);
     byDate.set(key, current);
   }
 
   const allDates = [...byDate.keys()].sort();
-  const firstDate = allDates[0] ? new Date(allDates[0]) : startOfDay(new Date());
+  const firstDate = allDates[0]
+    ? new Date(`${allDates[0]}T00:00:00.000Z`)
+    : startOfDay(new Date());
   const daily: DailyPositioning[] = [];
 
   for (let i = 0; i < windowDays; i += 1) {
     const date = format(addDays(firstDate, i), "yyyy-MM-dd");
     const rows = byDate.get(date) ?? [];
-    const subject = rows.find((row) => row.hotelId === subjectHotelId);
-    const comps = rows.filter((row) => row.hotelId !== subjectHotelId && row.roleType === "COMP");
+    const rawSubject = rows.find((row) => row.hotelId === subjectHotelId);
+    const subjectSoldOut = Boolean(rawSubject && isSoldOut(rawSubject.availabilityStatus));
+    const subject = rows.find((row) => row.hotelId === subjectHotelId && !isSoldOut(row.availabilityStatus));
+    const rawComps = rows.filter((row) => row.hotelId !== subjectHotelId && row.roleType === "COMP");
+    const allCompsSoldOut = rawComps.length > 0 && rawComps.every((row) => isSoldOut(row.availabilityStatus));
+    const comps = rows.filter(
+      (row) => row.hotelId !== subjectHotelId && row.roleType === "COMP" && !isSoldOut(row.availabilityStatus),
+    );
     const compRates = comps.map((row) => row.nightlyRate);
     const subjectRate = subject?.nightlyRate ?? null;
     const compAverage = compRates.length ? mean(compRates) : 0;
@@ -144,6 +163,8 @@ export function computeRateAnalytics(
       rateIndex,
       subjectRank,
       compCount: compRates.length,
+      subjectSoldOut,
+      allCompsSoldOut,
     });
   }
 
@@ -207,7 +228,7 @@ export function computeRateAnalytics(
 
   const compSummaryMap = new Map<string, { hotelId: string; hotelName: string; rates: number[] }>();
   latest
-    .filter((row) => row.hotelId !== subjectHotelId)
+    .filter((row) => row.hotelId !== subjectHotelId && !isSoldOut(row.availabilityStatus))
     .forEach((row) => {
       const current = compSummaryMap.get(row.hotelId) ?? { hotelId: row.hotelId, hotelName: row.hotelName, rates: [] };
       current.rates.push(row.nightlyRate);

@@ -21,7 +21,6 @@ export function UploadStartForm({
   const filteredCompSets = compsets.filter(
     (compSet) => compSet.subjectHotelId === subjectHotelId,
   );
-  console.log(compsets);
   return (
     <form
       className="space-y-4"
@@ -79,13 +78,7 @@ export function UploadStartForm({
           )}
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="importMode">Import mode</Label>
-        <Select id="importMode" name="importMode" defaultValue="APPEND_NEW">
-          <option value="APPEND_NEW">APPEND_NEW</option>
-          <option value="UPSERT_MATCHING">UPSERT_MATCHING</option>
-        </Select>
-      </div>
+      <input type="hidden" name="importMode" value="APPEND_NEW" />
       <div className="space-y-2">
         <Label htmlFor="file">Expedia rate file</Label>
         <Input
@@ -95,6 +88,10 @@ export function UploadStartForm({
           accept=".xlsx,.xls,.csv"
           required
         />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="scheduledDemoDate">Scheduled demo date</Label>
+        <Input id="scheduledDemoDate" name="scheduledDemoDate" type="date" />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit">Upload file</Button>

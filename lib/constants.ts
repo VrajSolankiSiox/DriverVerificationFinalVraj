@@ -7,6 +7,7 @@ export const navItems = [
   { href: "/hotels", label: "Hotels" },
   { href: "/compsets", label: "CompSets" },
   { href: "/reports", label: "Reports" },
+  { href: "/demo", label: "Demo" },
   { href: "/uploads", label: "Uploads" },
   // { href: "/templates", label: "Templates" },
   { href: "/settings", label: "Settings" },
@@ -29,7 +30,7 @@ export const logicalUploadFields = [
 export const sectionTitleMap: Record<ReportSectionType, string> = {
   COVER: "Cover / Title",
   EXECUTIVE_SUMMARY: "Executive Summary",
-  COMPETITIVE_GAP_SUMMARY: "Where You're Losing",
+  COMPETITIVE_GAP_SUMMARY: "Competitive Performance Snapshot",
   SUBJECT_SNAPSHOT: "Subject Hotel Snapshot",
   COMPSET_OVERVIEW: "CompSet Overview",
   RATE_POSITIONING_SUMMARY: "Rate Positioning Summary",

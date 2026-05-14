@@ -39,13 +39,12 @@ async function readUploadBatchBuffer(batch: { storagePath: string; fileBlob?: Ui
 
 function parseHeaderDate(value: unknown, yearFallback: number) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return startOfDay(value);
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
   }
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (parsed) {
-      const d = new Date(parsed.y, parsed.m - 1, parsed.d);
-      return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+      const d = new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d)); return Number.isNaN(d.getTime()) ? null : d;
     }
   }
   const text = String(value ?? "").trim();
@@ -54,8 +53,7 @@ function parseHeaderDate(value: unknown, yearFallback: number) {
   // Common patterns like "16-Apr", "16-Apr-2026", "16/Apr", "2026-04-16"
   const isoLike = /^\d{4}-\d{2}-\d{2}$/;
   if (isoLike.test(text)) {
-    const d = new Date(text);
-    return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+    const [y, m, day] = text.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1, day)); return Number.isNaN(d.getTime()) ? null : d;
   }
 
   const numeric = text.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/](\d{2,4}))?$/);
@@ -74,8 +72,7 @@ function parseHeaderDate(value: unknown, yearFallback: number) {
     if (month < 0 || month > 11 || day < 1 || day > 31) {
       return null;
     }
-    const d = new Date(year, month, day);
-    return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+    const d = new Date(Date.UTC(year, month, day)); return Number.isNaN(d.getTime()) ? null : d;
   }
 
   const m = text.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})(?:[-/ ](\d{2,4}))?$/);
@@ -91,8 +88,7 @@ function parseHeaderDate(value: unknown, yearFallback: number) {
   if (monthIndex === undefined) return null;
   const year = yearText ? Number(yearText.length === 2 ? `20${yearText}` : yearText) : yearFallback;
   if (!Number.isFinite(year) || !Number.isFinite(day)) return null;
-  const d = new Date(year, monthIndex, day);
-  return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+  const d = new Date(Date.UTC(year, monthIndex, day)); return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function looksLikeDow(value: unknown) {
@@ -104,6 +100,7 @@ function isMarketAverageRow(value: string) {
   const v = value.trim().toLowerCase();
   return (
     v.includes("market average") ||
+    v.includes("market avg") ||
     v.includes("single los shopping") ||
     v.includes("shopping results") ||
     v === "day"
@@ -128,6 +125,11 @@ function parseRateCellNumber(cell: XLSX.CellObject | undefined) {
   };
 
   return parseFromText(cell.v) ?? parseFromText(cell.w);
+}
+
+function isSoldOutText(value: unknown) {
+  const text = String(value ?? "").trim().toLowerCase();
+  return text === "x" || text === "soldout" || text === "sold out" || text === "na" || text === "n/a";
 }
 
 function extractRateGridObservations(
@@ -214,6 +216,23 @@ function extractRateGridObservations(
       const valueCell = worksheet[XLSX.utils.encode_cell({ r, c })];
       const valueText = String(valueCell?.v ?? valueCell?.w ?? "").trim();
       if (!valueText) continue;
+      if (isSoldOutText(valueText)) {
+        rows.push({
+          rowNumber: syntheticRowNumber++,
+          hotelName,
+          hotelCode: null,
+          stayDate,
+          captureDate,
+          roomType: null,
+          ratePlan: null,
+          refundableFlag: null,
+          nightlyRate: 0,
+          currency: null,
+          availabilityStatus: "SOLD_OUT",
+          errors: stayDate ? [] : ["Stay date is required."],
+        });
+        continue;
+      }
       const nightlyRate = parseRateCellNumber(valueCell);
       if (nightlyRate === null) {
         rows.push({
@@ -296,7 +315,20 @@ export async function getUploadBatch(id: string) {
       createdAt: true,
       updatedAt: true,
       subjectHotel: { select: { id: true, name: true } },
-      compSet: { select: { id: true, name: true } },
+      compSet: {
+        select: {
+          id: true,
+          name: true,
+          members: {
+            select: {
+              id: true,
+              roleType: true,
+              hotel: { select: { id: true, name: true } },
+            },
+            orderBy: { displayOrder: "asc" },
+          },
+        },
+      },
     },
   });
 }
@@ -309,7 +341,17 @@ export async function listMappingTemplates(sourceName?: string) {
 }
 
 export async function createUploadBatch(
-  input: { sourceName: string; subjectHotelId: string; compSetId: string; importMode: "APPEND_NEW" | "UPSERT_MATCHING"; fileName: string; fileType: string; fileSizeBytes: number; fileBuffer: Buffer },
+  input: {
+    sourceName: string;
+    subjectHotelId: string;
+    compSetId: string;
+    importMode: "APPEND_NEW";
+    scheduledDemoDate?: string | null;
+    fileName: string;
+    fileType: string;
+    fileSizeBytes: number;
+    fileBuffer: Buffer;
+  },
   actorId: string,
 ) {
   validateUploadFile({ name: input.fileName, type: input.fileType, size: input.fileSizeBytes });
@@ -326,6 +368,9 @@ export async function createUploadBatch(
     storagePath: "",
     createdById: actorId,
     updatedById: actorId,
+    originalMetadataJson: {
+      scheduledDemoDate: parsed.scheduledDemoDate || null,
+    },
   };
 
   if (process.env.VERCEL || process.env.PERSIST_UPLOADS_IN_DB === "true") {
@@ -362,6 +407,34 @@ export async function createUploadBatch(
     action: "CREATED",
     message: `Uploaded ${batch.fileName}`,
   });
+
+  const subjectHotel = await prisma.hotel.findUnique({
+    where: { id: parsed.subjectHotelId },
+    select: { id: true, name: true },
+  });
+  if (subjectHotel) {
+    const demoSessionModel = (prisma as unknown as { demoSession?: { create: (args: unknown) => Promise<unknown> } })
+      .demoSession;
+    if (demoSessionModel?.create) {
+      await demoSessionModel.create({
+        data: {
+          hotelId: subjectHotel.id,
+          uploadBatchId: batch.id,
+          hotelName: subjectHotel.name,
+          hotelOwnerName: null,
+          scheduledDate: parsed.scheduledDemoDate ? new Date(parsed.scheduledDemoDate) : null,
+          conducted: false,
+          conductedBy: null,
+          ownerFeedback: null,
+          additionalNotes: null,
+          createdById: actorId,
+          updatedById: actorId,
+        },
+      });
+    } else {
+      console.warn("[uploads] DemoSession model unavailable; skipping demo auto-seed for upload", batch.id);
+    }
+  }
 
   return batch;
 }
@@ -475,13 +548,14 @@ export async function validateUploadBatch(
 
   const initialLookup = new Set(batch.compSet.members.map((m) => normalizeHotelName(m.hotel.name)));
   const unresolvedFromFile = namesInFile.filter((name) => !initialLookup.has(normalizeHotelName(name)));
+  const unresolvedHotelsToAutoAdd = unresolvedFromFile.filter((name) => !isMarketAverageRow(name));
 
   let autoAddedHotels = 0;
-  if (parsed.autoAddUnresolvedHotels && unresolvedFromFile.length) {
+  if (parsed.autoAddUnresolvedHotels && unresolvedHotelsToAutoAdd.length) {
     const result = await addHotelsToCompSet(
       {
         compSetId: batch.compSetId,
-        hotelNames: unresolvedFromFile,
+        hotelNames: unresolvedHotelsToAutoAdd,
       },
       actorId,
     );
@@ -526,8 +600,11 @@ export async function validateUploadBatch(
     const matchedHotelName = matched?.name;
     const errors = [...row.errors];
 
-    if (sourceName && !matchedHotelId) {
+    if (sourceName && !matchedHotelId && !isMarketAverageRow(sourceName)) {
       errors.push("Hotel not found in compset. Add this hotel to the compset or provide a name override.");
+    }
+    if (sourceName && isMarketAverageRow(sourceName)) {
+      errors.push("Market Average rows are ignored.");
     }
 
     const duplicateKey =
@@ -543,7 +620,7 @@ export async function validateUploadBatch(
           ].join("|")
         : null;
 
-    if (sourceName && !matched) {
+    if (sourceName && !matched && !isMarketAverageRow(sourceName)) {
       unresolved.add(sourceName);
     }
 
@@ -615,7 +692,7 @@ export async function validateUploadBatch(
   return validation;
 }
 
-export async function importUploadBatch(input: { uploadBatchId: string; mode: "APPEND_NEW" | "UPSERT_MATCHING" }, actorId: string) {
+export async function importUploadBatch(input: { uploadBatchId: string; mode: "APPEND_NEW" }, actorId: string) {
   const parsed = uploadImportSchema.parse(input);
   const batch = await prisma.uploadBatch.findUniqueOrThrow({
     where: { id: parsed.uploadBatchId },
@@ -687,7 +764,8 @@ export async function importUploadBatch(input: { uploadBatchId: string; mode: "A
       skipped += 1;
       continue;
     }
-    if (row.nightlyRate === null || row.nightlyRate === undefined) {
+    const soldOut = String(row.availabilityStatus ?? "").toUpperCase().includes("SOLD_OUT");
+    if ((row.nightlyRate === null || row.nightlyRate === undefined) && !soldOut) {
       skipReasons.noNightlyRate += 1;
       skipped += 1;
       continue;
@@ -705,7 +783,7 @@ export async function importUploadBatch(input: { uploadBatchId: string; mode: "A
       roomType: row.roomType,
       ratePlan: row.ratePlan,
       refundableFlag: row.refundableFlag,
-      nightlyRate: row.nightlyRate,
+      nightlyRate: soldOut ? 0 : Number(row.nightlyRate),
       currency: row.currency,
       availabilityStatus: row.availabilityStatus,
       sourceHotelName: row.hotelName,
@@ -723,7 +801,7 @@ export async function importUploadBatch(input: { uploadBatchId: string; mode: "A
         roomType: row.roomType,
         ratePlan: row.ratePlan,
         refundableFlag: row.refundableFlag,
-        nightlyRate: row.nightlyRate,
+        nightlyRate: soldOut ? 0 : Number(row.nightlyRate),
         currency: row.currency,
         availabilityStatus: row.availabilityStatus,
         sourceHotelName: row.hotelName,
@@ -735,7 +813,7 @@ export async function importUploadBatch(input: { uploadBatchId: string; mode: "A
       },
       update: {
         uniqueKey,
-        nightlyRate: row.nightlyRate,
+        nightlyRate: soldOut ? 0 : Number(row.nightlyRate),
         availabilityStatus: row.availabilityStatus,
       },
     });
@@ -758,12 +836,8 @@ export async function importUploadBatch(input: { uploadBatchId: string; mode: "A
 
   for (const candidate of candidates) {
     if (existingKeys.has(candidate.uniqueKey)) {
-      if (parsed.mode === "APPEND_NEW") {
-        skipped += 1;
-        skipReasons.existing += 1;
-      } else {
-        toUpdate.push(candidate.update);
-      }
+      skipped += 1;
+      skipReasons.existing += 1;
       continue;
     }
     toCreate.push(candidate.create);
@@ -875,12 +949,13 @@ export async function convertRateGridToValidation(
   const namesToAutoAdd = namesInFile.filter((name) => {
     const normalizedName = normalizeHotelName(name);
     if (normalizedName === normalizedSubjectHotel) return false;
+    if (isMarketAverageRow(name)) return false;
     return true;
   });
 
   // Ensure compset contains all hotels seen in the grid (no manual hotel profiles needed)
   let autoAddedHotels = 0;
-  if (input.autoAddUnresolvedHotels !== false && namesToAutoAdd.length) {
+  if (input.autoAddUnresolvedHotels === true && namesToAutoAdd.length) {
     const result = await addHotelsToCompSet({ compSetId: batch.compSetId, hotelNames: namesToAutoAdd }, actorId);
     autoAddedHotels = result.addedMembers;
   }
@@ -979,7 +1054,6 @@ export async function convertRateGridToValidation(
     entityType: "UploadBatch",
     entityId: batch.id,
     action: "VALIDATED",
-    message: `Converted rate grid to ${rows.length} observations`,
     metadata: validation.summary,
   });
 
@@ -1011,3 +1085,77 @@ export async function deleteUploadBatch(id: string, actorId: string) {
 
   return { success: true };
 }
+
+export async function updateUploadBatchFile(
+  id: string,
+  input: {
+    fileName: string;
+    fileType: string;
+    fileSizeBytes: number;
+    fileBuffer: Buffer;
+    keepSettings?: boolean;
+  },
+  actorId: string,
+) {
+  validateUploadFile({ name: input.fileName, type: input.fileType, size: input.fileSizeBytes });
+  
+  const batch = await prisma.uploadBatch.findUniqueOrThrow({
+    where: { id },
+    select: { 
+      id: true, 
+      storagePath: true, 
+      selectedSheet: true, 
+      mappingJson: true,
+    },
+  });
+
+  // Delete old file if it exists
+  if (batch.storagePath) {
+    await deleteFileFromPath(batch.storagePath);
+  }
+
+  // Delete old observations
+  await prisma.rateObservation.deleteMany({
+    where: { uploadBatchId: id },
+  });
+
+  const safeFileName = sanitizeFileName(input.fileName);
+  const storagePath = getUploadPath(`${id}-${safeFileName}`);
+  await saveBufferToPath(storagePath, input.fileBuffer);
+  
+  const sheets = parseWorkbookBuffer(input.fileBuffer, safeFileName);
+  const workbookMeta = getWorkbookMeta(sheets);
+  const sheetNames = (workbookMeta as { sheetNames?: string[] })?.sheetNames ?? [];
+  
+  const stillHasSheet = batch.selectedSheet && sheetNames.includes(batch.selectedSheet);
+
+  const updated = await prisma.uploadBatch.update({
+    where: { id },
+    data: {
+      fileName: safeFileName,
+      fileType: input.fileType,
+      fileSizeBytes: input.fileSizeBytes,
+      storagePath,
+      workbookMetaJson: workbookMeta,
+      status: "DRAFT",
+      // Reset processing state if we can't keep settings or if not requested
+      selectedSheet: input.keepSettings && stillHasSheet ? batch.selectedSheet : null,
+      mappingJson: input.keepSettings && stillHasSheet ? batch.mappingJson : null,
+      previewJson: null,
+      validationJson: null,
+      summaryJson: null,
+      updatedById: actorId,
+    },
+  });
+
+  await logActivity({
+    actorId,
+    entityType: "UploadBatch",
+    entityId: id,
+    action: "UPDATED",
+    message: `Re-uploaded file for ${safeFileName}${input.keepSettings ? " (kept settings)" : ""}`,
+  });
+
+  return updated;
+}
+

@@ -16,7 +16,7 @@ const envSchema = z.object({
   REVIEW_SCRAPER_ENABLED_SOURCES: z
     .string()
     .optional()
-    .transform((v) => (v ? v.split(",").map((s) => s.trim()) : ["TRIPADVISOR"])),
+    .transform((v) => (v ? v.split(",").map((s) => s.trim()) : ["GOOGLE"])),
   FEATURE_PAGE_SPEED_ADAPTER: z
     .string()
     .optional()

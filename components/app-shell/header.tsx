@@ -1,4 +1,3 @@
-import { SignOutButton } from "@/components/auth/signout-button";
 
 function getHeaderCopy(pathname: string) {
   if (pathname === "/dashboard") {
@@ -120,12 +119,8 @@ function getHeaderCopy(pathname: string) {
 }
 
 export function Header({
-  userName,
-  role,
   pathname,
 }: {
-  userName: string;
-  role: string;
   pathname: string;
 }) {
   const headerCopy = getHeaderCopy(pathname);
@@ -136,14 +131,6 @@ export function Header({
         <p className="truncate text-xl mx-auto font-semibold text-foreground">
           {headerCopy.title}
         </p>
-        {/* <p className="truncate text-sm text-muted-foreground">{headerCopy.subtitle}</p> */}
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="text-right text-sm">
-          <div className="font-medium">{userName}</div>
-          <div className="text-muted-foreground">{role}</div>
-        </div>
-        <SignOutButton />
       </div>
     </header>
   );

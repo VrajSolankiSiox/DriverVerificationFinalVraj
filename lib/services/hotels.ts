@@ -18,6 +18,61 @@ function isUniqueConstraintError(error: unknown) {
   );
 }
 
+const MANUAL_REVIEW_SCREENSHOT_MARKER = "MANUAL_RESPONSE_SCREENSHOT";
+const REVIEW_SOURCE_BY_PLATFORM = {
+  google: "GOOGLE",
+  expedia: "EXPEDIA",
+  booking: "BOOKING",
+  tripadvisor: "GOOGLE",
+} as const;
+
+type ReviewScreenshotPayload = Partial<Record<keyof typeof REVIEW_SOURCE_BY_PLATFORM, string | null | undefined>>;
+type ReviewPresencePayload = Partial<
+  Record<
+    keyof typeof REVIEW_SOURCE_BY_PLATFORM,
+    "RESPONDED" | "NOT_RESPONDED" | "NO_PRESENCE" | "NO_REVIEW"
+  >
+>;
+
+async function persistReviewResponseScreenshots(
+  hotelId: string,
+  screenshots: ReviewScreenshotPayload | undefined,
+  presence: ReviewPresencePayload | undefined,
+  actorId: string,
+) {
+  await prisma.reviewSnapshot.deleteMany({
+    where: {
+      hotelId,
+      sentimentSummary: MANUAL_REVIEW_SCREENSHOT_MARKER,
+    },
+  });
+
+  for (const [platform, source] of Object.entries(REVIEW_SOURCE_BY_PLATFORM) as Array<
+    [keyof typeof REVIEW_SOURCE_BY_PLATFORM, "GOOGLE" | "EXPEDIA" | "BOOKING"]
+  >) {
+    const imageDataUrl = screenshots?.[platform];
+    const hasImage = typeof imageDataUrl === "string" && imageDataUrl.trim().length > 0;
+    const status = presence?.[platform] ?? (hasImage ? "RESPONDED" : "NO_PRESENCE");
+
+    await prisma.reviewSnapshot.create({
+      data: {
+        hotelId,
+        source,
+        sentimentSummary: MANUAL_REVIEW_SCREENSHOT_MARKER,
+        rawJson: {
+          kind: MANUAL_REVIEW_SCREENSHOT_MARKER,
+          platform,
+          presence: status,
+          imageDataUrl: hasImage ? imageDataUrl.trim() : null,
+        },
+        capturedAt: new Date(),
+        createdById: actorId,
+        updatedById: actorId,
+      },
+    });
+  }
+}
+
 export async function listHotels() {
   return prisma.hotel.findMany({
     where: { profileSource: "MANUAL" },
@@ -69,7 +124,19 @@ export async function getHotel(id: string) {
 
 export async function createHotel(input: HotelInput, actorId: string) {
   const parsed = hotelSchema.parse(input);
-  const { otaRatings: _otaRatings, ...hotelData } = parsed;
+  const {
+    otaRatings: _otaRatings,
+    reviewResponsePresence: _reviewResponsePresence,
+    reviewResponseScreenshots: _reviewResponseScreenshots,
+    reviewResponded,
+    organicSearchPositions,
+    ...hotelData
+  } = parsed;
+  const baseOtaRatings = ((parsed.otaRatings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const otaRatingsWithOrganic = {
+    ...baseOtaRatings,
+    __organicSearchPositions: organicSearchPositions ?? {},
+  };
 
   const existing = await prisma.hotel.findFirst({
     where: { name: parsed.name },
@@ -84,12 +151,14 @@ export async function createHotel(input: HotelInput, actorId: string) {
     created = await prisma.hotel.create({
       data: {
         ...hotelData,
+        isSubject: true,
         profileSource: "MANUAL",
         websiteUrl: hotelData.websiteUrl || null,
         bookingUrl: hotelData.bookingUrl || null,
         email: hotelData.email || null,
         starLevel: hotelData.starLevel ?? null,
-        otaRatings: parsed.otaRatings ?? Prisma.JsonNull,
+        reviewReplied: reviewResponded,
+        otaRatings: otaRatingsWithOrganic ?? Prisma.JsonNull,
         createdById: actorId,
         updatedById: actorId,
       },
@@ -100,6 +169,13 @@ export async function createHotel(input: HotelInput, actorId: string) {
     }
     throw error;
   }
+
+  await persistReviewResponseScreenshots(
+    created.id,
+    parsed.reviewResponseScreenshots,
+    parsed.reviewResponsePresence,
+    actorId,
+  );
 
   await logActivity({
     actorId,
@@ -114,14 +190,52 @@ export async function createHotel(input: HotelInput, actorId: string) {
 
 export async function updateHotel(id: string, input: HotelInput, actorId: string) {
   const parsed = hotelSchema.parse(input);
-  const { otaRatings: _otaRatings, ...hotelData } = parsed;
+  const {
+    otaRatings: _otaRatings,
+    reviewResponsePresence: _reviewResponsePresence,
+    reviewResponseScreenshots: _reviewResponseScreenshots,
+    reviewResponded,
+    organicSearchPositions,
+    ...hotelData
+  } = parsed;
+  const baseOtaRatings = ((parsed.otaRatings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const otaRatingsWithOrganic = {
+    ...baseOtaRatings,
+    __organicSearchPositions: organicSearchPositions ?? {},
+  };
 
   const existing = await prisma.hotel.findFirst({
     where: { name: parsed.name, NOT: { id } },
-    select: { id: true },
+    select: { id: true, profileSource: true },
   });
   if (existing) {
-    throw new HotelNameAlreadyExistsError(parsed.name);
+    if (existing.profileSource === "AUTO_COMPSET") {
+      await prisma.$transaction(async (tx) => {
+        const memberships = await tx.compSetMember.findMany({
+          where: { hotelId: existing.id },
+          select: { id: true, compSetId: true },
+        });
+
+        for (const membership of memberships) {
+          const alreadyInCompSet = await tx.compSetMember.findFirst({
+            where: { compSetId: membership.compSetId, hotelId: id },
+            select: { id: true },
+          });
+          if (alreadyInCompSet) {
+            await tx.compSetMember.delete({ where: { id: membership.id } });
+          } else {
+            await tx.compSetMember.update({
+              where: { id: membership.id },
+              data: { hotelId: id },
+            });
+          }
+        }
+
+        await tx.hotel.delete({ where: { id: existing.id } });
+      });
+    } else {
+      throw new HotelNameAlreadyExistsError(parsed.name);
+    }
   }
 
   let updated;
@@ -130,11 +244,13 @@ export async function updateHotel(id: string, input: HotelInput, actorId: string
       where: { id },
       data: {
         ...hotelData,
+        isSubject: true,
         websiteUrl: hotelData.websiteUrl || null,
         bookingUrl: hotelData.bookingUrl || null,
         email: hotelData.email || null,
         starLevel: hotelData.starLevel ?? null,
-        otaRatings: parsed.otaRatings ?? Prisma.JsonNull,
+        reviewReplied: reviewResponded,
+        otaRatings: otaRatingsWithOrganic ?? Prisma.JsonNull,
         updatedById: actorId,
       },
     });
@@ -144,6 +260,13 @@ export async function updateHotel(id: string, input: HotelInput, actorId: string
     }
     throw error;
   }
+
+  await persistReviewResponseScreenshots(
+    id,
+    parsed.reviewResponseScreenshots,
+    parsed.reviewResponsePresence,
+    actorId,
+  );
 
   await logActivity({
     actorId,

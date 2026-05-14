@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 
 import { Button } from "@/components/ui/button";
 
-export function UploadImportForm({ uploadBatchId, importMode }: { uploadBatchId: string; importMode: "APPEND_NEW" | "UPSERT_MATCHING" }) {
+export function UploadImportForm({ uploadBatchId, importMode }: { uploadBatchId: string; importMode: "APPEND_NEW" }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);

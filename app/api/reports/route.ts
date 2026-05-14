@@ -13,8 +13,8 @@ export async function POST(request: Request) {
   try {
     const user = await requireApiUser();
     const payload = await request.json();
-    const report = await createReport(payload, user.id);
-    return NextResponse.json({ id: report.id });
+    const result = await createReport(payload, user.id);
+    return NextResponse.json({ id: result.report.id, warning: result.warning ?? null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to create report" }, { status: 400 });
   }

@@ -13,7 +13,8 @@ export const uploadStartSchema = z.object({
   sourceName: z.string().min(2),
   subjectHotelId: z.string().min(1),
   compSetId: z.string().min(1),
-  importMode: z.enum(["APPEND_NEW", "UPSERT_MATCHING"]),
+  importMode: z.literal("APPEND_NEW"),
+  scheduledDemoDate: z.string().optional().nullable(),
   fileName: z.string().min(1).max(255),
   fileType: z.string().min(1),
   fileSizeBytes: z.number().int().min(0).max(MAX_UPLOAD_BYTES),
@@ -49,10 +50,10 @@ export const uploadMappingSchema = z.object({
     stripCommas: z.boolean().default(true),
   }),
   saveTemplate: z.boolean().default(false),
-  autoAddUnresolvedHotels: z.boolean().default(true),
+  autoAddUnresolvedHotels: z.boolean().default(false),
 });
 
 export const uploadImportSchema = z.object({
   uploadBatchId: z.string().min(1),
-  mode: z.enum(["APPEND_NEW", "UPSERT_MATCHING"]),
+  mode: z.literal("APPEND_NEW"),
 });

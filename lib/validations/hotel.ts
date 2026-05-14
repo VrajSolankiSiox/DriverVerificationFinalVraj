@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { OTA_PLATFORMS } from "@/lib/validations/compset";
+import { compsetRatingOrXInputPattern } from "@/lib/validations/compset";
+
+const reviewResponsePlatforms = ["google", "expedia", "booking", "tripadvisor"] as const;
 
 export const hotelSchema = z.object({
   name: z.string().trim().min(2),
-  isSubject: z.boolean().default(false),
   brand: z.string().optional().nullable(),
   addressLine1: z.string().min(3),
   addressLine2: z.string().optional().nullable(),
@@ -12,18 +13,41 @@ export const hotelSchema = z.object({
   country: z.string().min(2),
   websiteUrl: z.string().url().optional().or(z.literal("")).nullable(),
   bookingUrl: z.string().url().optional().or(z.literal("")).nullable(),
+  ownerName: z.string().optional().nullable(),
+  salesPerson: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
   roomCount: z.coerce.number().int().positive().optional().nullable(),
   starLevel: z.coerce.number().min(1).max(5).optional().nullable(),
   ownershipNotes: z.string().optional().nullable(),
   managementNotes: z.string().optional().nullable(),
-  // OTA platform ratings: keyed by platform name, value 0–10
+  reviewResponded: z.boolean().optional().default(false),
+  reviewResponseScreenshots: z
+    .record(
+      z.enum(reviewResponsePlatforms),
+      z.string().optional().nullable(),
+    )
+    .optional(),
+  reviewResponsePresence: z
+    .record(
+      z.enum(reviewResponsePlatforms),
+      z.enum(["RESPONDED", "NOT_RESPONDED", "NO_PRESENCE", "NO_REVIEW"]),
+    )
+    .optional(),
+  // OTA platform ratings: keyed by platform name, accepts `9.5 (200)` or `X`
   otaRatings: z
     .record(
-      z.enum(OTA_PLATFORMS),
-      z.union([z.coerce.number().min(0).max(10), z.literal("")])
+      z.string(),
+      z.string().trim().regex(compsetRatingOrXInputPattern, "Use `9.5 (200)` or `X`.")
     )
+    .optional(),
+  organicSearchPositions: z
+    .object({
+      google: z.union([z.coerce.number().int().positive(), z.literal(""), z.literal("X"), z.literal("x")]).optional(),
+      expedia: z.union([z.coerce.number().int().positive(), z.literal(""), z.literal("X"), z.literal("x")]).optional(),
+      bookingCom: z.union([z.coerce.number().int().positive(), z.literal(""), z.literal("X"), z.literal("x")]).optional(),
+      priceline: z.union([z.coerce.number().int().positive(), z.literal(""), z.literal("X"), z.literal("x")]).optional(),
+    })
     .optional(),
 });
 

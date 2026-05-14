@@ -4,7 +4,7 @@ import type { RateAnalyticsResult } from "@/lib/analytics/rate-analytics";
 import { sectionTitleMap } from "@/lib/constants";
 import { buildBattlecard } from "@/lib/reports/battlecard";
 import { buildCompetitiveGaps } from "@/lib/reports/competitive-gaps";
-import { buildExecutiveSummaryNarrative, buildMethodologyNote, buildOpportunityBuckets } from "@/lib/reports/narrative";
+import { buildExecutiveSummaryNarrative, buildOpportunityBuckets } from "@/lib/reports/narrative";
 
 export type ReportViewModel = {
   reportId: string;
@@ -74,9 +74,33 @@ export type ReportViewModel = {
     comps: Array<{ hotelId: string; hotelName: string; snapshots: Array<{ source: string; averageRating: number; reviewCount: number }> }>;
   };
   seoAudit?: { total: number; notes: string[] } | null;
-  manualExecutiveSummary?: string | null;
-  manualOpportunityNotes?: string | null;
-  methodologyNote?: string | null;
+  includeSeoComparison?: boolean;
+  comparisonDataset?: {
+    observations: Array<{
+      hotelId: string;
+      hotelName: string;
+      stayDate: string;
+      captureDate: string;
+      nightlyRate: number;
+      currency: string;
+      availabilityStatus?: string | null;
+      roomType?: string | null;
+    }>;
+    hotels: Array<{
+      id: string;
+      name: string;
+      roleType: "SUBJECT" | "COMP";
+      otaRatings?: Record<string, string | number>;
+    }>;
+    reviewSnapshotsByHotel: Record<
+      string,
+      Array<{ source: string; averageRating: number; reviewCount: number }>
+    >;
+    reviewResponseScreenshotsByHotel?: Record<
+      string,
+      Array<{ platform: string; imageDataUrl: string | null; capturedAt: string; presence: "RESPONDED" | "NOT_RESPONDED" | "NO_PRESENCE" | "NO_REVIEW" }>
+    >;
+  };
 };
 
 export type BuiltSection = {
@@ -99,12 +123,15 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
   });
 
   const compCount = viewModel.compSet.members.filter((m) => m.roleType === "COMP").length;
+  const hasWebsiteData = viewModel.websiteAudit?.scoreTotal != null;
+  const seoEnabled = viewModel.includeSeoComparison !== false;
+  const hasSeoData = (viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null) != null;
   const competitiveGaps = buildCompetitiveGaps(
     viewModel.analytics,
     viewModel.websiteAudit?.scoreTotal ?? null,
     compCount,
     {
-      seoScore: viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null,
+      seoScore: seoEnabled ? (viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null) : null,
       reviewSubject: viewModel.reviewSnapshots?.subject,
       reviewComps: viewModel.reviewSnapshots?.comps,
     },
@@ -116,7 +143,7 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       title: sectionTitleMap.COVER,
       displayOrder: 1,
       visibility: "CLIENT_SAFE",
-      enabled: true,
+      enabled: hasWebsiteData,
       content: {
         title: viewModel.reportName,
         subtitle: `${viewModel.subjectHotel.name} • ${viewModel.subjectHotel.city}, ${viewModel.subjectHotel.country}`,
@@ -129,7 +156,7 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       visibility: "CLIENT_SAFE",
       enabled: true,
       content: {
-        text: viewModel.manualExecutiveSummary || summary,
+        text: summary,
       },
     },
     {
@@ -207,7 +234,7 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       title: sectionTitleMap.WEBSITE_AUDIT,
       displayOrder: 10,
       visibility: "CLIENT_SAFE",
-      enabled: true,
+      enabled: hasWebsiteData && seoEnabled,
       content: {
         websiteAudit: viewModel.websiteAudit,
         competitors: viewModel.competitorWebsiteAudits ?? [],
@@ -229,14 +256,16 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       title: sectionTitleMap.SEO_FINDINGS,
       displayOrder: 12,
       visibility: "CLIENT_SAFE",
-      enabled: true,
+      enabled: seoEnabled && hasSeoData,
       content: {
         seoScore: viewModel.websiteAudit?.seoScoreTotal ?? viewModel.seoAudit?.total ?? null,
-        competitorSeoScores: (viewModel.competitorWebsiteAudits ?? []).map((audit) => ({
-          hotelId: audit.hotelId,
-          hotelName: audit.hotelName,
-          seoScoreTotal: audit.seoScoreTotal,
-        })),
+        competitorSeoScores: (viewModel.competitorWebsiteAudits ?? [])
+          .filter((audit) => audit.seoScoreTotal !== null)
+          .map((audit) => ({
+            hotelId: audit.hotelId,
+            hotelName: audit.hotelName,
+            seoScoreTotal: audit.seoScoreTotal,
+          })),
         notes: viewModel.websiteAudit?.seoFindings ?? viewModel.seoAudit?.notes ?? [],
       },
     },
@@ -248,7 +277,6 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       enabled: true,
       content: {
         items: opportunityBuckets,
-        notes: viewModel.manualOpportunityNotes,
       },
     },
     {
@@ -282,16 +310,6 @@ export function buildReportSections(viewModel: ReportViewModel): BuiltSection[] 
       visibility: "INTERNAL_ONLY",
       enabled: true,
       content: battlecard,
-    },
-    {
-      type: "DISCLAIMER_METHOD",
-      title: sectionTitleMap.DISCLAIMER_METHOD,
-      displayOrder: 16,
-      visibility: "CLIENT_SAFE",
-      enabled: true,
-      content: {
-        text: viewModel.methodologyNote || buildMethodologyNote(),
-      },
     },
   ];
 
