@@ -1140,10 +1140,10 @@ export async function updateUploadBatchFile(
       status: "DRAFT",
       // Reset processing state if we can't keep settings or if not requested
       selectedSheet: input.keepSettings && stillHasSheet ? batch.selectedSheet : null,
-      mappingJson: input.keepSettings && stillHasSheet ? batch.mappingJson : null,
-      previewJson: null,
-      validationJson: null,
-      summaryJson: null,
+      mappingJson: input.keepSettings && stillHasSheet ? batch.mappingJson ?? Prisma.JsonNull : Prisma.DbNull,
+      previewJson: Prisma.DbNull,
+      validationJson: Prisma.DbNull,
+      summaryJson: Prisma.DbNull,
       updatedById: actorId,
     },
   });

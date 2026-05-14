@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, MessageSquare, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { updateDemoOutcome, updateDemoSalesPerson } from "./actions";
+import { updateDemoFeedback, updateDemoOutcome, updateDemoSalesPerson } from "./actions";
 import { toast } from "react-toastify";
 
 type DemoRow = {
