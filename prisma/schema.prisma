@@ -14,6 +14,7 @@ model User {
   email        String    @unique
   passwordHash String
   role         UserRole
+  archivedAt   DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   accounts     Account[]
@@ -402,8 +403,7 @@ model ActivityLog {
 
 enum UserRole {
   ADMIN
-  MANAGER
-  REP
+  USER
 }
 
 enum HotelRoleType {

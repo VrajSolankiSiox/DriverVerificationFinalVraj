@@ -17,7 +17,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
     {
       "bg-primary text-primary-foreground hover:bg-transparent hover:text-primary border transition-all hover:border-primary":
         variant === "default",
@@ -35,8 +35,8 @@ export function Button({
         variant === "ghost",
 
       "h-10 px-4 py-2": size === "default",
-      "h-9 rounded-md px-3": size === "sm",
-      "h-11 rounded-md px-8": size === "lg",
+      "h-9 rounded-lg px-3": size === "sm",
+      "h-11 rounded-lg px-8": size === "lg",
     },
     className,
   );

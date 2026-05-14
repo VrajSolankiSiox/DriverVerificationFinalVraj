@@ -19,8 +19,6 @@ const protectedPrefixes = [
   "/api/website-audits",
 ];
 
-const adminPrefixes = ["/settings"];
-
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
@@ -35,10 +33,6 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if (adminPrefixes.some((prefix) => pathname.startsWith(prefix)) && token.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

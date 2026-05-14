@@ -19,6 +19,7 @@ import {
 import { navItems } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/auth/signout-button";
+import Image from "next/image";
 
 const iconMap = {
   Dashboard: LayoutGrid,
@@ -52,7 +53,10 @@ export function Sidebar({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
         setUserMenuOpen(false);
       }
     }
@@ -64,22 +68,19 @@ export function Sidebar({
     setOptimisticPath(href);
   };
 
-  // Filter nav items based on user role
-  const filteredNavItems = navItems.filter((item) => {
-    if (item.href === "/settings" && role !== "ADMIN") {
-      return false;
-    }
-    return true;
-  });
-
   const initials = userName
-    ? userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    ? userName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
     : "U";
 
   return (
     <nav className="relative h-screen w-64 bg-white border-r border-slate-200 shadow-sm lg:block overflow-hidden">
       {/* Header/Logo Section */}
-      <div className="px-4 py-6 border-b border-slate-100 bg-white">
+      <div className="px-4 py-3 border-b border-slate-100 bg-white">
         <Link
           href="/dashboard"
           className="block group"
@@ -88,28 +89,38 @@ export function Sidebar({
             onNavigate();
           }}
         >
-          <div className="flex flex-col items-center text-center space-y-2">
-            {/* Icon */}
-            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-              <BarChart3 className="h-6 w-6 text-primary" />
-            </div>
+          <div className="flex flex-col items-center text-center">
+            {/* Logo / Identity Block */}
+            <div className="">
+              {/* Product Name */}
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold text-primary tracking-tight  transition-colors duration-200 group-hover:text-primary">
+                  Hotel Demo
+                </h1>
 
-            {/* Brand Text */}
-            <div className="space-y-0.5">
-              <div className="text-lg font-bold text-slate-800 group-hover:text-slate-900 transition-colors leading-tight">
-                Hotel Demo
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-px w-6 bg-slate-200" />
+
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Intelligence
+                  </p>
+
+                  <div className="h-px w-6 bg-slate-200" />
+                </div>
               </div>
-              <div className="text-sm font-medium text-slate-600 group-hover:text-slate-700 transition-colors">
-                Intelligence
-              </div>
+
+              {/* Brand Attribution */}
             </div>
           </div>
         </Link>
       </div>
 
       {/* Navigation Section — padded at bottom so user footer never overlaps */}
-      <div className="px-3 py-4 space-y-1 overflow-y-auto" style={{ paddingBottom: '90px' }}>
-        {filteredNavItems.map((item) => {
+      <div
+        className="px-3 py-4 space-y-1 overflow-y-auto"
+        style={{ paddingBottom: "90px" }}
+      >
+        {navItems.map((item) => {
           const Icon = iconMap[item.label as keyof typeof iconMap];
           const active = optimisticPath.startsWith(item.href);
           return (
@@ -142,13 +153,20 @@ export function Sidebar({
       </div>
 
       {/* User Profile Footer — absolutely pinned to the very bottom */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-slate-100 bg-white p-3" ref={userMenuRef}>
+      <div
+        className="absolute bottom-0 left-0 right-0 border-t border-slate-100 bg-white p-3"
+        ref={userMenuRef}
+      >
         {/* Logout popup — floats above independently, doesn't affect footer layout */}
         {userMenuOpen && (
           <div className="absolute bottom-full left-3 right-3 mb-2 rounded-xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] overflow-hidden z-50">
             <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-              <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
-              <p className="text-xs text-slate-500 capitalize">{role.toLowerCase()}</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">
+                {userName}
+              </p>
+              <p className="text-xs text-slate-500 capitalize">
+                {role.toLowerCase() == "admin" && role.toLowerCase()}
+              </p>
             </div>
             <div className="p-1.5">
               <SignOutButton
@@ -169,12 +187,14 @@ export function Sidebar({
           </div>
           <div className="flex-1 text-left min-w-0">
             <p className="truncate font-medium text-slate-800">{userName}</p>
-            <p className="text-xs text-slate-500 capitalize">{role.toLowerCase()}</p>
+            <p className="text-xs text-slate-500 capitalize">
+              {role.toLowerCase() == "admin" && role.toLowerCase()}
+            </p>
           </div>
           <ChevronUp
             className={cn(
               "h-4 w-4 text-slate-400 transition-transform duration-200",
-              userMenuOpen ? "rotate-180" : ""
+              userMenuOpen ? "rotate-180" : "",
             )}
           />
         </button>

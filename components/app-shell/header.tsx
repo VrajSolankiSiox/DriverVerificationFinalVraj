@@ -1,3 +1,4 @@
+import Image from "next/image";
 
 function getHeaderCopy(pathname: string) {
   if (pathname === "/dashboard") {
@@ -118,11 +119,7 @@ function getHeaderCopy(pathname: string) {
   };
 }
 
-export function Header({
-  pathname,
-}: {
-  pathname: string;
-}) {
+export function Header({ pathname }: { pathname: string }) {
   const headerCopy = getHeaderCopy(pathname);
 
   return (
@@ -131,6 +128,19 @@ export function Header({
         <p className="truncate text-xl mx-auto font-semibold text-foreground">
           {headerCopy.title}
         </p>
+      </div>
+      <div className="inline-flex items-end gap-2     er  px-3 py-1.5   transition-all duration-200  ">
+        <span className="text-[11px] font-medium text-slate-500">
+          Powered by
+        </span>
+
+        <Image
+          src="/rank-me-now-full-logo.webp"
+          alt="RankMeNow Logo"
+          width={70}
+          height={14}
+          className="h-auto w-auto object-contain opacity-90"
+        />
       </div>
     </header>
   );

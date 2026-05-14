@@ -4,14 +4,12 @@ import { canApproveReport, hasRole } from "@/lib/permissions";
 
 describe("permissions", () => {
   it("allows higher roles to satisfy lower role requirements", () => {
-    expect(hasRole("ADMIN", "REP")).toBe(true);
-    expect(hasRole("MANAGER", "REP")).toBe(true);
-    expect(hasRole("REP", "MANAGER")).toBe(false);
+    expect(hasRole("ADMIN", "USER")).toBe(true);
+    expect(hasRole("USER", "ADMIN")).toBe(false);
   });
 
-  it("only managers and admins can approve reports", () => {
-    expect(canApproveReport("MANAGER")).toBe(true);
+  it("only admins can approve reports", () => {
     expect(canApproveReport("ADMIN")).toBe(true);
-    expect(canApproveReport("REP")).toBe(false);
+    expect(canApproveReport("USER")).toBe(false);
   });
 });

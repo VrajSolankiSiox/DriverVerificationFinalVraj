@@ -62,6 +62,10 @@ export const authOptions: NextAuthOptions = {
           recordLoginFailure(key);
           return null;
         }
+        if (user.archivedAt) {
+          recordLoginFailure(key);
+          return null;
+        }
 
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) {
@@ -136,7 +140,7 @@ export async function requireApiRole(role: UserRole) {
 }
 
 export function assertRole(userRole: UserRole, requiredRole: UserRole) {
-  const order: Record<UserRole, number> = { REP: 1, MANAGER: 2, ADMIN: 3 };
+  const order: Record<UserRole, number> = { USER: 1, ADMIN: 2 };
   if (order[userRole] < order[requiredRole]) {
     throw new Error("Forbidden");
   }

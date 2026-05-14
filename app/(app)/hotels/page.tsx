@@ -4,7 +4,14 @@ import { Plus, EllipsisVertical, Eye, PencilLine } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { listHotels } from "@/lib/services/hotels";
 
 export default async function HotelsPage() {
@@ -69,7 +76,10 @@ export default async function HotelsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <details name="hotel-actions-menu" className="relative inline-block">
+                      <details
+                        name="hotel-actions-menu"
+                        className="relative inline-block"
+                      >
                         <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground">
                           <EllipsisVertical className="h-4 w-4" />
                         </summary>

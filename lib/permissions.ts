@@ -1,9 +1,8 @@
 import type { UserRole } from "@prisma/client";
 
 const rank: Record<UserRole, number> = {
-  REP: 1,
-  MANAGER: 2,
-  ADMIN: 3,
+  USER: 1,
+  ADMIN: 2,
 };
 
 export function hasRole(userRole: UserRole, requiredRole: UserRole) {
@@ -11,9 +10,9 @@ export function hasRole(userRole: UserRole, requiredRole: UserRole) {
 }
 
 export function canApproveReport(role: UserRole) {
-  return hasRole(role, "MANAGER");
+  return hasRole(role, "ADMIN");
 }
 
 export function canManageTemplates(role: UserRole) {
-  return hasRole(role, "MANAGER");
+  return hasRole(role, "ADMIN");
 }

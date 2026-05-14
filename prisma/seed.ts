@@ -15,8 +15,7 @@ async function main() {
 
   const users = [
     { name: "Ava Admin", email: "admin@rankmenow.io", role: "ADMIN" as const },
-    { name: "Mason Manager", email: "manager@rankmenow.io", role: "MANAGER" as const },
-    { name: "Riley Rep", email: "rep@rankmenow.io", role: "REP" as const },
+    { name: "Uma User", email: "user@rankmenow.io", role: "USER" as const },
   ];
 
   for (const user of users) {

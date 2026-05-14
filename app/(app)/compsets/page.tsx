@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Plus, Building2, Users, Layers3, EllipsisVertical, Eye, PencilLine } from "lucide-react";
+import {
+  Plus,
+  Building2,
+  Users,
+  Layers3,
+  EllipsisVertical,
+  Eye,
+  PencilLine,
+} from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -74,7 +82,7 @@ export default async function CompSetsPage() {
       )}
 
       {/* Table */}
-      <Card className="overflow-visible rounded-2xl rounded-md border-muted/50 shadow-md">
+      <Card className="overflow-visible   border-muted/50 shadow-md">
         <CardHeader className="border-b bg-white flex items-center flex-row justify-between  rounded-md">
           <div className="flex">
             <CardTitle>CompSet Directory</CardTitle>
@@ -135,7 +143,10 @@ export default async function CompSetsPage() {
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <details name="compset-actions-menu" className="relative inline-block">
+                      <details
+                        name="compset-actions-menu"
+                        className="relative inline-block"
+                      >
                         <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground">
                           <EllipsisVertical className="h-4 w-4" />
                         </summary>

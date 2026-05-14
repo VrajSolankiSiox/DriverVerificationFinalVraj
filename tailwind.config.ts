@@ -23,7 +23,7 @@ const config: Config = {
         background: "hsl(0 0% 100%)",
         foreground: "hsl(222 47% 11%)",
         primary: {
-          DEFAULT: "#10b981",
+          DEFAULT: "#4f46e5",
           foreground: "hsl(210 40% 98%)",
         },
         secondary: {
