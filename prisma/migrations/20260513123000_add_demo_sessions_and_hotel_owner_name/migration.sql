@@ -1,6 +1,17 @@
 ALTER TABLE "Hotel"
 ADD COLUMN IF NOT EXISTS "ownerName" TEXT;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'DemoOutcome'
+  ) THEN
+    CREATE TYPE "DemoOutcome" AS ENUM ('PENDING', 'NO_SHOW', 'COMPLETED', 'CANCELLED', 'RESCHEDULED');
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS "DemoSession" (
   "id" TEXT NOT NULL,
   "hotelId" TEXT NOT NULL,
@@ -9,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "DemoSession" (
   "hotelName" TEXT NOT NULL,
   "hotelOwnerName" TEXT,
   "scheduledDate" TIMESTAMP(3),
-  "conducted" BOOLEAN NOT NULL DEFAULT false,
+  "outcome" "DemoOutcome" NOT NULL DEFAULT 'PENDING',
   "conductedBy" TEXT,
   "demoDate" TIMESTAMP(3),
   "ownerFeedback" TEXT,
@@ -21,10 +32,27 @@ CREATE TABLE IF NOT EXISTS "DemoSession" (
   CONSTRAINT "DemoSession_pkey" PRIMARY KEY ("id")
 );
 
+ALTER TABLE "DemoSession"
+ADD COLUMN IF NOT EXISTS "outcome" "DemoOutcome" NOT NULL DEFAULT 'PENDING';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'DemoSession'
+      AND column_name = 'conducted'
+  ) THEN
+    UPDATE "DemoSession"
+    SET "outcome" = CASE WHEN "conducted" THEN 'COMPLETED'::"DemoOutcome" ELSE 'PENDING'::"DemoOutcome" END
+    WHERE "outcome" = 'PENDING'::"DemoOutcome";
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "DemoSession_hotelId_createdAt_idx" ON "DemoSession"("hotelId", "createdAt");
 CREATE INDEX IF NOT EXISTS "DemoSession_uploadBatchId_idx" ON "DemoSession"("uploadBatchId");
 CREATE INDEX IF NOT EXISTS "DemoSession_reportId_idx" ON "DemoSession"("reportId");
-CREATE INDEX IF NOT EXISTS "DemoSession_conducted_idx" ON "DemoSession"("conducted");
+CREATE INDEX IF NOT EXISTS "DemoSession_outcome_idx" ON "DemoSession"("outcome");
 
 DO $$
 BEGIN
