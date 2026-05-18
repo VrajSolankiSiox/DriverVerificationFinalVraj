@@ -10,24 +10,40 @@ function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export async function updateMyProfile(formData: FormData) {
-  const user = await requireUser();
+export type ProfileUpdateState = { success: true } | { error: string };
 
-  const firstName = clean(formData.get("firstName"));
-  const lastName = clean(formData.get("lastName"));
+export async function updateMyProfile(
+  formData: FormData,
+): Promise<ProfileUpdateState> {
+  try {
+    const user = await requireUser();
 
-  if (!firstName) {
-    throw new Error("First name is required.");
+    const firstName = clean(formData.get("firstName"));
+    const lastName = clean(formData.get("lastName"));
+
+    if (!firstName) {
+      return { error: "First name is required." };
+    }
+
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { name: fullName },
+    });
+
+    revalidatePath("/", "layout");
+    return { success: true as const };
+  } catch (e: any) {
+    return { error: String(e?.message || "Failed to update profile.") };
   }
+}
 
-  const fullName = `${firstName} ${lastName}`.trim();
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { name: fullName },
-  });
-
-  revalidatePath("/settings");
+export async function updateMyProfileActionState(
+  _prevState: ProfileUpdateState | null,
+  formData: FormData,
+): Promise<ProfileUpdateState> {
+  return updateMyProfile(formData);
 }
 
 export async function createUserAsAdmin(formData: FormData) {

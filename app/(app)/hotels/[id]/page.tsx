@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { HotelActions } from "@/components/hotels/hotel-actions";
+import { HotelScreenshotGallery } from "@/components/hotels/hotel-screenshot-gallery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -314,28 +315,10 @@ export default async function HotelDetailPage({
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            {reviewResponseScreenshots.length ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {reviewResponseScreenshots.map((item) => (
-                  <div key={item.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <div className="border-b border-slate-100 px-3 py-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        {item.platform}
-                      </p>
-                      <p className="text-[11px] text-slate-500">Status: {item.reviewStatus}</p>
-                      <p className="text-xs text-slate-400">{formatDate(item.capturedAt)}</p>
-                    </div>
-                    <img
-                      src={item.imageDataUrl}
-                      alt={`${item.platform} review response screenshot`}
-                      className="h-48 w-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No response screenshots uploaded yet.</p>
-            )}
+            <HotelScreenshotGallery
+              screenshots={reviewResponseScreenshots}
+              hotelId={hotel.id}
+            />
           </CardContent>
         </Card>
       </div>

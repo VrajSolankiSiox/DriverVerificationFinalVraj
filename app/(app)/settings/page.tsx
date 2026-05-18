@@ -1,17 +1,17 @@
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import {
   archiveUserAsAdmin,
   createUserAsAdmin,
   restoreUserAsAdmin,
-  updateMyProfile,
 } from "./actions";
 import Link from "next/link";
+import { ProfileForm } from "@/components/settings/profile-form";
 
 function splitName(name: string | null | undefined) {
   const value = (name ?? "").trim();
@@ -87,40 +87,11 @@ export default async function SettingsPage({
             <CardTitle>My Profile</CardTitle>
           </CardHeader>
           <CardContent>
-            <form
-              action={updateMyProfile}
-              className="grid gap-4 md:grid-cols-2"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={myName.firstName}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={myName.lastName}
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  value={dbUser?.email ?? user.email ?? ""}
-                  readOnly
-                  disabled
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Button type="submit">Save Profile</Button>
-              </div>
-            </form>
+            <ProfileForm
+              firstName={myName.firstName}
+              lastName={myName.lastName}
+              email={dbUser?.email ?? user.email ?? ""}
+            />
           </CardContent>
         </Card>
       ) : null}

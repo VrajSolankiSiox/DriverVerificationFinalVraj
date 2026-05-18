@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
-import { Loader2, Star } from "lucide-react";
+import { Loader2, Star, X, ZoomIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ export function HotelForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [activeImage, setActiveImage] = useState<{ url: string; platform: string } | null>(null);
 
   // TripAdvisor hidden from Create/Edit Hotel OTA inputs per product request.
   const [selectedPlatforms] = useState<OtaPlatform[]>(
@@ -155,6 +156,7 @@ export function HotelForm({
   };
 
   return (
+    <>
     <form
       className="grid gap-6 md:grid-cols-2"
       onSubmit={form.handleSubmit(
@@ -270,25 +272,52 @@ export function HotelForm({
                     </select>
                   </div>
 
-                  {/* Upload area */}
-                  <label
-                    htmlFor={`review-screenshot-${platform}`}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => handleDropScreenshot(event, platform)}
-                    className="flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg border border-dashed p-4 text-center hover:bg-muted/40 transition"
-                  >
-                    {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt={`${platform} preview`}
-                        className="max-h-40 rounded-md object-cover"
-                      />
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        Click or drag to upload
-                      </div>
-                    )}
-                  </label>
+                  {/* Preview (clickable to enlarge) + remove button — shown only when image exists */}
+                  {previewUrl ? (
+                    <div className="relative overflow-hidden rounded-lg border">
+                      <button
+                        type="button"
+                        className="group block w-full"
+                        onClick={() => setActiveImage({ url: previewUrl, platform })}
+                      >
+                        <img
+                          src={previewUrl}
+                          alt={`${platform} preview`}
+                          className="max-h-40 w-full object-cover transition-opacity group-hover:opacity-80"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/20">
+                          <ZoomIn className="h-7 w-7 text-white opacity-0 drop-shadow group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="absolute right-1.5 top-1.5 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                        onClick={() => setReviewResponseScreenshots((prev) => ({ ...prev, [platform]: "" }))}
+                        title="Remove image"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* Upload area — only shows when no image uploaded */}
+                  {!previewUrl ? (
+                    <label
+                      htmlFor={`review-screenshot-${platform}`}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => handleDropScreenshot(event, platform)}
+                      className="flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg border border-dashed p-4 text-center hover:bg-muted/40 transition"
+                    >
+                      <div className="text-xs text-muted-foreground">Click or drag to upload</div>
+                    </label>
+                  ) : (
+                    <label
+                      htmlFor={`review-screenshot-${platform}`}
+                      className="flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/40 transition"
+                    >
+                      Change image
+                    </label>
+                  )}
 
                   <Input
                     id={`review-screenshot-${platform}`}
@@ -499,5 +528,43 @@ export function HotelForm({
         </Button>
       </div>
     </form>
+
+    {/* Lightbox Modal */}
+    {activeImage && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
+        onClick={() => setActiveImage(null)}
+      >
+        <div
+          className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900 capitalize">
+                {activeImage.platform} — Review Response Screenshot
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveImage(null)}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-auto flex justify-center bg-slate-50">
+            <img
+              src={activeImage.url}
+              alt={`${activeImage.platform} review response screenshot`}
+              className="max-h-[80vh] w-full object-contain"
+            />
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }
