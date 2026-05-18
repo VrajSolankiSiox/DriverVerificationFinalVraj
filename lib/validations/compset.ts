@@ -24,7 +24,11 @@ export const compsetMemberSchema = z.object({
 
 export const compsetHotelRowSchema = z.object({
   hotelName: z.string().min(1, "Hotel name is required"),
-  starRating: z.coerce.number().min(0, "Star rating must be 0 or higher.").max(5, "Star rating must be 5 or lower."),
+  starRating: z.union([
+    z.coerce.number().min(0, "Star rating must be 0 or higher.").max(5, "Star rating must be 5 or lower."),
+    z.literal("X"),
+    z.literal("x")
+  ]),
   roomCount: z.coerce.number().int().positive("Room count must be greater than 0."),
   ratings: z.object({
     google: z

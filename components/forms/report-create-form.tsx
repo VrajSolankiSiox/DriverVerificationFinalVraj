@@ -381,7 +381,7 @@ export function ReportCreateForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="subjectHotelId">Subject hotel</Label>
+        <Label htmlFor="subjectHotelId">Main Property</Label>
         <Select
           id="subjectHotelId"
           name="subjectHotelId"

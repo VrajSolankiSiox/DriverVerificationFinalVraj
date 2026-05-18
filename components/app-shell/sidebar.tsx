@@ -27,6 +27,7 @@ const iconMap = {
   CompSets: SlidersHorizontal,
   Uploads: Upload,
   Reports: ChartLine,
+  Presentations: BarChart3,
   Demo: Presentation,
   Templates: FileText,
   Settings: Settings,

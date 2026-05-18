@@ -10,20 +10,21 @@ import {
   XAxis,
   YAxis,
   Legend,
-  ReferenceLine,
+  Cell,
 } from "recharts";
 
 /* Rating scale definitions */
-const OTA_SCALES: Record<string, { min: number; max: number; label: string }> = {
-  "Booking.com": { min: 2.5, max: 10, label: "2.5 - 10" },
-  Booking: { min: 2.5, max: 10, label: "2.5 - 10" },
-  Expedia: { min: 0, max: 10, label: "0 - 10" },
-  Agoda: { min: 2, max: 10, label: "2 - 10" },
-  "Hotels.com": { min: 0, max: 10, label: "0 - 10" },
-  Priceline: { min: 1, max: 10, label: "1 - 10" },
-  "Google Business": { min: 1, max: 5, label: "1 - 5" },
-  Google: { min: 1, max: 5, label: "1 - 5" },
-};
+const OTA_SCALES: Record<string, { min: number; max: number; label: string }> =
+  {
+    "Booking.com": { min: 2.5, max: 10, label: "2.5 - 10" },
+    Booking: { min: 2.5, max: 10, label: "2.5 - 10" },
+    Expedia: { min: 0, max: 10, label: "0 - 10" },
+    Agoda: { min: 2, max: 10, label: "2 - 10" },
+    "Hotels.com": { min: 0, max: 10, label: "0 - 10" },
+    Priceline: { min: 1, max: 10, label: "1 - 10" },
+    "Google Business": { min: 1, max: 5, label: "1 - 5" },
+    Google: { min: 1, max: 5, label: "1 - 5" },
+  };
 
 function getScale(platform: string) {
   return OTA_SCALES[platform] ?? { min: 0, max: 10, label: "0 - 10" };
@@ -40,18 +41,32 @@ function normalize(raw: number, platform: string): number {
 
 /* Platform icon colors (matching reference design) */
 const PLATFORM_COLORS: Record<string, string> = {
-  "Booking.com": "#1d4ed8",
-  Booking: "#1d4ed8",
-  Expedia: "#0f766e",
-  Agoda: "#334155",
+  "Booking.com": "#003580",
+  Booking: "#003580",
+  Expedia: "#F9A825",
+  Agoda: "#E53935",
   "Hotels.com": "#0369a1",
-  Priceline: "#1e3a8a",
-  "Google Business": "#475569",
-  Google: "#475569",
+  Priceline: "#6A1B9A",
+  "Google Business": "#4285F4",
+  Google: "#4285F4",
 };
+
+/* Hotel colors - shades of blue matching Hotel-by-Hotel Rate Comparison */
+const HOTEL_COLORS = [
+  "#2563eb", // Primary blue
+  "#3b82f6",
+  "#60a5fa",
+  "#93c5fd",
+  "#bfdbfe",
+  "#dbeafe",
+];
 
 function platformColor(p: string) {
   return PLATFORM_COLORS[p] ?? "#6366f1";
+}
+
+function getHotelColor(index: number): string {
+  return HOTEL_COLORS[index % HOTEL_COLORS.length];
 }
 
 /* Types */
@@ -67,7 +82,11 @@ export type OtaComparisonInput = {
 };
 
 /* Main component */
-export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput }) {
+export function OtaRatingComparisonChart({
+  data,
+}: {
+  data: OtaComparisonInput;
+}) {
   const { subjectRatings, competitors, subjectName } = data;
   const isTripAdvisor = (platform: string) =>
     platform.trim().toLowerCase() === "tripadvisor";
@@ -76,7 +95,9 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
   const allPlatforms = useMemo(() => {
     const set = new Set<string>();
     Object.keys(subjectRatings).forEach((p) => set.add(p));
-    competitors.forEach((c) => Object.keys(c.ratings).forEach((p) => set.add(p)));
+    competitors.forEach((c) =>
+      Object.keys(c.ratings).forEach((p) => set.add(p)),
+    );
     return [...set].filter((p) => !isTripAdvisor(p));
   }, [subjectRatings, competitors]);
 
@@ -94,28 +115,34 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
         ? compRaws.reduce((s, v) => s + v, 0) / compRaws.length
         : null;
 
-      const subjectNorm = subjectRaw !== null ? normalize(subjectRaw, platform) : null;
-      const compAvgNorm = compAvgRaw !== null ? normalize(compAvgRaw, platform) : null;
-
+      const subjectNorm = subjectRaw;
+      const compAvgNorm = compAvgRaw;
       return {
         platform,
         subjectRaw,
         compAvgRaw,
         subjectNorm,
         compAvgNorm,
-        diff: subjectNorm !== null && compAvgNorm !== null ? subjectNorm - compAvgNorm : null,
+        diff:
+          subjectNorm !== null && compAvgNorm !== null
+            ? subjectNorm - compAvgNorm
+            : null,
       };
     });
   }, [allPlatforms, subjectRatings, competitors]);
 
   /* Aggregated averages (normalized) */
   const overallSubjectAvg = useMemo(() => {
-    const vals = platformStats.filter((p) => p.subjectNorm !== null).map((p) => p.subjectNorm!);
+    const vals = platformStats
+      .filter((p) => p.subjectNorm !== null)
+      .map((p) => p.subjectNorm!);
     return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
   }, [platformStats]);
 
   const overallCompAvg = useMemo(() => {
-    const vals = platformStats.filter((p) => p.compAvgNorm !== null).map((p) => p.compAvgNorm!);
+    const vals = platformStats
+      .filter((p) => p.compAvgNorm !== null)
+      .map((p) => p.compAvgNorm!);
     return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
   }, [platformStats]);
 
@@ -135,15 +162,17 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
   );
   const chartData = useMemo(
     () =>
-      visiblePlatforms.map((platform) => {
-        const row: Record<string, number | string | null> = { platform };
-        for (const hotel of hotelsForChart) {
+      hotelsForChart.map((hotel) => {
+        const row: Record<string, number | string | null> = {
+          hotel: hotel.name,
+        };
+        for (const platform of visiblePlatforms) {
           const raw = hotel.ratings[platform];
-          row[hotel.name] = Number.isFinite(raw) ? Number(normalize(raw, platform).toFixed(2)) : null;
+          row[platform] = Number.isFinite(raw) ? Number(raw.toFixed(2)) : null;
         }
         return row;
       }),
-    [visiblePlatforms, hotelsForChart],
+    [hotelsForChart, visiblePlatforms],
   );
 
   if (allPlatforms.length === 0) {
@@ -177,7 +206,7 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
         </div>
         <div>
           <p className="text-sm font-semibold text-blue-900">
-            Ratings are normalized to a 10-point scale for comparison.
+            {/* Ratings are normalized to a 10-point scale for comparison. */}
           </p>
           <p className="mt-0.5 text-xs text-blue-700">
             View original scores in each OTA&apos;s own scale in the summary
@@ -246,7 +275,9 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
             Your Property Average
-            <span className="ml-1 font-normal text-slate-400">(Normalized)</span>
+            {/* <span className="ml-1 font-normal text-slate-400">
+              (Normalized)
+            </span> */}
           </p>
           <div className="mt-3 flex items-end gap-3">
             <span className="text-4xl font-bold tracking-tight text-slate-900">
@@ -258,8 +289,8 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
                   overallDiff >= 0 ? "text-emerald-600" : "text-red-600"
                 }`}
               >
-                {overallDiff >= 0 ? "↑" : "↓"} {Math.abs(overallDiff).toFixed(2)}{" "}
-                vs comp avg
+                {overallDiff >= 0 ? "↑" : "↓"}{" "}
+                {Math.abs(overallDiff).toFixed(2)} vs comp avg
               </span>
             )}
           </div>
@@ -269,7 +300,9 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
             Competitor Average
-            <span className="ml-1 font-normal text-slate-400">(Normalized)</span>
+            <span className="ml-1 font-normal text-slate-400">
+              (Normalized)
+            </span>
           </p>
           <span className="mt-3 block text-4xl font-bold tracking-tight text-slate-900">
             {overallCompAvg !== null ? overallCompAvg.toFixed(2) : "-"}
@@ -304,94 +337,91 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Rating Comparison{" "}
-            <span className="font-normal text-slate-400">
-              (Normalized to 10-point scale)
-            </span>
-          </p>
-          <p className="mb-4 text-[11px] text-slate-400">Rating (0 - 10)</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Rating Comparison{" "}
+          {/* <span className="font-normal text-slate-400">
+            (Normalized to 10-point scale)
+          </span> */}
+        </p>
+        <p className="mb-4 text-[11px] text-slate-400">Rating (0 - 10)</p>
 
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 10, bottom: 10, left: 0 }}
-                barCategoryGap="20%"
-                barGap={4}
-              >
-                <defs>
-                  <linearGradient id="otaSubjectFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" />
-                    <stop offset="100%" stopColor="#1d4ed8" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  stroke="#e2e8f0"
-                  strokeDasharray="3 6"
-                  vertical={false}
+        <div className="w-full">
+          <ResponsiveContainer
+            width="90%"
+            height={Math.max(hotelsForChart.length * 60 + 80, 300)}
+          >
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 10, right: 30, bottom: 10, left: 120 }}
+              barCategoryGap="25%"
+            >
+              <CartesianGrid
+                stroke="#e2e8f0"
+                strokeDasharray="3 6"
+                horizontal={true}
+              />
+              <XAxis
+                type="number"
+                domain={[0, "dataMax + 1"]}
+                ticks={[0, 2, 4, 6, 8, 10]}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                dataKey="hotel"
+                type="category"
+                tick={{ fill: "#475569", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                width={110}
+              />
+              <Tooltip
+                formatter={(value: any, name: any) => [
+                  typeof value === "number" ? value.toFixed(2) : "-",
+                  String(name),
+                ]}
+                labelStyle={{ color: "#0f172a", fontWeight: 700, fontSize: 13 }}
+                contentStyle={{
+                  borderRadius: "14px",
+                  border: "1px solid #e2e8f0",
+                  background: "rgba(255,255,255,0.98)",
+                  boxShadow: "0 10px 30px -12px rgba(15,23,42,0.18)",
+                  fontSize: 13,
+                }}
+                cursor={{ fill: "rgba(186,230,253,0.16)" }}
+              />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                iconType="rect"
+                iconSize={10}
+                wrapperStyle={{
+                  fontSize: 12,
+                  color: "#475569",
+                  paddingBottom: 12,
+                }}
+              />
+              {visiblePlatforms.map((platform) => (
+                <Bar
+                  key={platform}
+                  dataKey={platform}
+                  stackId="ratings"
+                  fill={platformColor(platform)}
+                  radius={platform == "Priceline" ? [0, 6, 6, 0] : [0, 0, 0, 0]}
+                  isAnimationActive={false}
                 />
-                <XAxis
-                  dataKey="platform"
-                  tick={{ fill: "#475569", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  interval={0}
-                />
-                <YAxis
-                  domain={[0, 10]}
-                  ticks={[0, 2, 4, 6, 8, 10]}
-                  tick={{ fill: "#94a3b8", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={30}
-                />
-                <ReferenceLine y={5} stroke="#e2e8f0" strokeDasharray="2 4" />
-                <Tooltip
-                  formatter={(value: any, name: any) => [
-                    typeof value === "number" ? value.toFixed(2) : "-",
-                    String(name),
-                  ]}
-                  labelStyle={{ color: "#0f172a", fontWeight: 700, fontSize: 13 }}
-                  contentStyle={{
-                    borderRadius: "14px",
-                    border: "1px solid #e2e8f0",
-                    background: "rgba(255,255,255,0.98)",
-                    boxShadow: "0 10px 30px -12px rgba(15,23,42,0.18)",
-                    fontSize: 13,
-                  }}
-                  cursor={{ fill: "rgba(186,230,253,0.16)" }}
-                />
-                <Legend
-                  verticalAlign="top"
-                  align="right"
-                  iconType="rect"
-                  iconSize={10}
-                  wrapperStyle={{ fontSize: 12, color: "#475569", paddingBottom: 12 }}
-                />
-                {hotelsForChart.map((hotel, index) => (
-                  <Bar
-                    key={hotel.name}
-                    dataKey={hotel.name}
-                    fill={
-                      index === 0
-                        ? "url(#otaSubjectFill)"
-                        : ["#0f766e", "#0369a1", "#1e3a8a", "#334155", "#0c4a6e", "#155e75", "#475569"][
-                            (index - 1) % 7
-                          ]
-                    }
-                    radius={[6, 6, 0, 0]}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-          <p className="mt-2 text-[11px] text-slate-400">
-            Info: All ratings are normalized to a 10-point scale for accurate
-            comparison across different rating systems.
-          </p>
+        <p className="mt-2 text-[11px] text-slate-400">
+          Info: All ratings are normalized to a 10-point scale for accurate
+          comparison across different rating systems. Each colored segment
+          represents a hotel's rating for the given OTA platform.
+        </p>
       </div>
 
       {/* Individual competitor breakdown */}
@@ -478,7 +508,9 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
         >
           <div
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              overallDiff >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+              overallDiff >= 0
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
             }`}
           >
             {overallDiff >= 0 ? (
@@ -538,5 +570,3 @@ export function OtaRatingComparisonChart({ data }: { data: OtaComparisonInput })
     </div>
   );
 }
-
-

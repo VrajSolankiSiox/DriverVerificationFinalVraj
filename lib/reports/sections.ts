@@ -33,6 +33,8 @@ export type ReportViewModel = {
       name: string;
       roleType: "SUBJECT" | "COMP";
       otaRatings?: Record<string, string | number>;
+      roomCount?: number | null;
+      starLevel?: number | null;
     }>;
   };
   analytics: RateAnalyticsResult;
@@ -91,6 +93,8 @@ export type ReportViewModel = {
       name: string;
       roleType: "SUBJECT" | "COMP";
       otaRatings?: Record<string, string | number>;
+      roomCount?: number | null;
+      starLevel?: number | null;
     }>;
     reviewSnapshotsByHotel: Record<
       string,

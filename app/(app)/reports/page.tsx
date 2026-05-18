@@ -68,7 +68,7 @@ export default async function ReportsPage() {
             </Table>
           ) : (
             <div className="p-10">
-              <EmptyState title="No reports" description="Create the first report for a subject hotel and compset." actionHref="/reports/new" actionLabel="New report" />
+              <EmptyState title="No reports" description="Create the first report for a main property and compset." actionHref="/reports/new" actionLabel="New report" />
             </div>
           )}
         </CardContent>

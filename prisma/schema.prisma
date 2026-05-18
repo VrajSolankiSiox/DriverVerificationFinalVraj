@@ -345,6 +345,7 @@ model Report {
   subjectHotel           Hotel            @relation(fields: [subjectHotelId], references: [id], onDelete: Cascade)
   sections               ReportSection[]
   demoSessions           DemoSession[]
+  presentations          Presentation[]
 
   @@index([subjectHotelId, createdAt])
   @@index([status])
@@ -404,6 +405,21 @@ model ActivityLog {
 enum UserRole {
   ADMIN
   USER
+}
+
+model Presentation {
+  id                  String   @id @default(cuid())
+  reportId            String
+  name                String
+  reportTitleOverride String?
+  slideTitlesJson     Json?
+  createdById         String
+  updatedById         String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  report              Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, updatedAt])
 }
 
 enum HotelRoleType {

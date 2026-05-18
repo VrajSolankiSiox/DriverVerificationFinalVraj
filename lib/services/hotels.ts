@@ -130,6 +130,7 @@ export async function createHotel(input: HotelInput, actorId: string) {
     reviewResponseScreenshots: _reviewResponseScreenshots,
     reviewResponded,
     organicSearchPositions,
+    salesPerson: _salesPerson,
     ...hotelData
   } = parsed;
   const baseOtaRatings = ((parsed.otaRatings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
@@ -156,7 +157,7 @@ export async function createHotel(input: HotelInput, actorId: string) {
         websiteUrl: hotelData.websiteUrl || null,
         bookingUrl: hotelData.bookingUrl || null,
         email: hotelData.email || null,
-        starLevel: hotelData.starLevel ?? null,
+        starLevel: typeof hotelData.starLevel === "number" ? hotelData.starLevel : null,
         reviewReplied: reviewResponded,
         otaRatings: otaRatingsWithOrganic ?? Prisma.JsonNull,
         createdById: actorId,
@@ -196,6 +197,7 @@ export async function updateHotel(id: string, input: HotelInput, actorId: string
     reviewResponseScreenshots: _reviewResponseScreenshots,
     reviewResponded,
     organicSearchPositions,
+    salesPerson: _salesPerson,
     ...hotelData
   } = parsed;
   const baseOtaRatings = ((parsed.otaRatings as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
@@ -248,7 +250,7 @@ export async function updateHotel(id: string, input: HotelInput, actorId: string
         websiteUrl: hotelData.websiteUrl || null,
         bookingUrl: hotelData.bookingUrl || null,
         email: hotelData.email || null,
-        starLevel: hotelData.starLevel ?? null,
+        starLevel: typeof hotelData.starLevel === "number" ? hotelData.starLevel : null,
         reviewReplied: reviewResponded,
         otaRatings: otaRatingsWithOrganic ?? Prisma.JsonNull,
         updatedById: actorId,

@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ReportStatus } from "@prisma/client";
 
 import { CompetitiveGapsGrid } from "@/components/reports/competitive-gaps-grid";
@@ -58,6 +59,71 @@ function parseOtaScore(value: string | number | null | undefined) {
   if (!match) return null;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildWeekwiseWeekdayWeekendData(
+  daily: Array<{ date: string; subjectRate: number | null; compAverage: number }>,
+) {
+  const buckets = new Map<
+    string,
+    {
+      monthLabel: string;
+      weekNumber: number;
+      weekdaySubject: number[];
+      weekdayComp: number[];
+      weekendSubject: number[];
+      weekendComp: number[];
+    }
+  >();
+
+  for (const row of daily) {
+    const d = new Date(`${row.date}T00:00:00`);
+    const monthLabel = d.toLocaleString("en-US", { month: "short" });
+    const weekNumber = Math.floor((d.getDate() - 1) / 7) + 1;
+    const key = `${d.getFullYear()}-${d.getMonth()}-${weekNumber}`;
+    const bucket = buckets.get(key) ?? {
+      monthLabel,
+      weekNumber,
+      weekdaySubject: [],
+      weekdayComp: [],
+      weekendSubject: [],
+      weekendComp: [],
+    };
+    const day = d.getDay();
+    const isWeekend = day === 0 || day === 6;
+
+    if (isWeekend) {
+      if (row.subjectRate !== null) bucket.weekendSubject.push(row.subjectRate);
+      if (row.compAverage > 0) bucket.weekendComp.push(row.compAverage);
+    } else {
+      if (row.subjectRate !== null) bucket.weekdaySubject.push(row.subjectRate);
+      if (row.compAverage > 0) bucket.weekdayComp.push(row.compAverage);
+    }
+
+    buckets.set(key, bucket);
+  }
+
+  const avg = (values: number[]) =>
+    values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+  return [...buckets.values()]
+    .sort((a, b) => a.weekNumber - b.weekNumber)
+    .flatMap((bucket) => [
+      {
+        label: "Weekday",
+        weekKey: `${bucket.monthLabel}-W${bucket.weekNumber}`,
+        weekLabel: `${bucket.monthLabel} - Week ${bucket.weekNumber}`,
+        subject: avg(bucket.weekdaySubject),
+        comp: avg(bucket.weekdayComp),
+      },
+      {
+        label: "Weekend",
+        weekKey: `${bucket.monthLabel}-W${bucket.weekNumber}`,
+        weekLabel: `${bucket.monthLabel} - Week ${bucket.weekNumber}`,
+        subject: avg(bucket.weekendSubject),
+        comp: avg(bucket.weekendComp),
+      },
+    ]);
 }
 
 function SectionCard({
@@ -170,6 +236,7 @@ export function ReportComparisonWorkspace({
   };
   viewModel: ReportViewModel;
 }) {
+  const router = useRouter();
   const baseHotels = viewModel.comparisonDataset?.hotels ?? [];
   const observations = viewModel.comparisonDataset?.observations ?? [];
   const reviewSnapshotsByHotel =
@@ -185,6 +252,8 @@ export function ReportComparisonWorkspace({
         name: string;
         roleType: "SUBJECT" | "COMP";
         otaRatings?: Record<string, string | number>;
+        roomCount?: number | null;
+        starLevel?: number | null;
       }
     >();
 
@@ -221,6 +290,7 @@ export function ReportComparisonWorkspace({
   const [groupHotelIds, setGroupHotelIds] = useState<string[]>(defaultCompIds);
   const [hotelSearch, setHotelSearch] = useState("");
   const [markingConducted, setMarkingConducted] = useState(false);
+  const [creatingPresentation, setCreatingPresentation] = useState(false);
   const [markStatus, setMarkStatus] = useState<string | null>(null);
 
   const hotelsById = useMemo(
@@ -407,18 +477,10 @@ export function ReportComparisonWorkspace({
     return true;
   });
 
-  const weekdayWeekendData = [
-    {
-      label: "Weekday",
-      subject: analytics.weekdayWeekend.weekdaySubjectAverage,
-      comp: analytics.weekdayWeekend.weekdayCompAverage,
-    },
-    {
-      label: "Weekend",
-      subject: analytics.weekdayWeekend.weekendSubjectAverage,
-      comp: analytics.weekdayWeekend.weekendCompAverage,
-    },
-  ];
+  const weekdayWeekendData = useMemo(
+    () => buildWeekwiseWeekdayWeekendData(analytics.daily),
+    [analytics.daily],
+  );
 
   const metricCards = [
     {
@@ -506,6 +568,31 @@ export function ReportComparisonWorkspace({
                 Presentation mode
               </Link>
             </Button>
+            {/*
+              TEMPORARILY DISABLED (commented out for easy restore):
+              Save Presentation flow.
+            */}
+            {/* <Button
+              variant="outline"
+              disabled={creatingPresentation}
+              onClick={async () => {
+                setCreatingPresentation(true);
+                try {
+                  const response = await fetch("/api/presentations", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reportId: report.id }),
+                  });
+                  const result = await response.json();
+                  if (!response.ok || !result.id) return;
+                  router.push(`/presentations/${result.id}/edit`);
+                } finally {
+                  setCreatingPresentation(false);
+                }
+              }}
+            >
+              {creatingPresentation ? "Creating..." : "Save Presentation"}
+            </Button> */}
             <Button
               variant="outline"
               disabled={markingConducted}
@@ -541,7 +628,7 @@ export function ReportComparisonWorkspace({
 
       <SectionCard
         title="Comparison Setup"
-        description="Choose a subject hotel, then compare against one hotel or a selected hotel group. Charts and report metrics update instantly."
+        description="Choose a main property, then compare against one hotel or a selected hotel group. Charts and report metrics update instantly."
         icon={<Hotel className="h-4 w-4" />}
       >
         <div className="rounded-2xl border border-sky-100 bg-[linear-gradient(135deg,#f8fbff_0%,#ffffff_46%,#eef5ff_100%)] p-4 shadow-[0_14px_40px_-28px_rgba(30,64,175,0.45)] md:p-5">
@@ -694,8 +781,58 @@ export function ReportComparisonWorkspace({
       </section>
 
       <SectionCard
+        title="Hotel Characteristics"
+        description="Star rating and room count for the main property and selected compset."
+        icon={<Hotel className="h-4 w-4" />}
+      >
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-900">
+              <tr>
+                <th className="px-4 py-3 font-medium">Hotel Name</th>
+                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium text-right">Star Rating</th>
+                <th className="px-4 py-3 font-medium text-right">Room Count</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {selectedHotelIds.map((hotelId) => {
+                const hotel = hotels.find((h) => h.id === hotelId);
+                if (!hotel) return null;
+                const isSubject = hotel.id === subjectHotelId;
+                return (
+                  <tr key={hotel.id} className={isSubject ? "bg-blue-50/30" : ""}>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {hotel.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                          isSubject
+                            ? "bg-blue-50 text-blue-700 ring-blue-700/10"
+                            : "bg-slate-50 text-slate-700 ring-slate-700/10"
+                        }`}
+                      >
+                        {isSubject ? "Subject" : "Comp"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {hotel.starLevel ? hotel.starLevel.toFixed(1) : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {hotel.roomCount ? hotel.roomCount.toLocaleString() : "-"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Competitive Performance Snapshot"
-        description="A quick editorial read on where the subject hotel is strong, soft, or visibly lagging against the selected comparison set."
+        description="A quick editorial read on where the main property is strong, soft, or visibly lagging against the selected comparison set."
         icon={<Radar className="h-4 w-4" />}
       >
         <CompetitiveGapsGrid gaps={visibleCompetitiveGaps} />
@@ -777,7 +914,7 @@ export function ReportComparisonWorkspace({
 
       <SectionCard
         title="Review Response Screenshots"
-        description="Uploaded review-response evidence for the selected subject hotel only."
+        description="Uploaded review-response evidence for the selected main property only."
         icon={<ShieldCheck className="h-4 w-4" />}
       >
         <ReviewResponseGallery hotels={reviewResponseHotels} />

@@ -8,7 +8,7 @@ import { runWebsiteAudit } from "@/lib/services/website-audit";
 
 type CompSetHotelInputRow = {
   hotelName: string;
-  starRating: number;
+  starRating: number | "X" | "x";
   roomCount: number;
   ratings: {
     google: string;
@@ -99,7 +99,7 @@ function createEmptyCompMemberMetadata(): CompMemberMetadata {
 }
 
 function buildCompMemberMetadata(input: {
-  starRating?: number;
+  starRating?: number | "X" | "x";
   roomCount?: number;
   ratings?: CompSetHotelInputRow["ratings"];
   organicSearchPositions?: CompSetHotelInputRow["organicSearchPositions"];
@@ -175,20 +175,21 @@ async function resolveCompHotels(
           city: "Unknown",
           country: "Unknown",
           roomCount: comp.roomCount,
-          starLevel: comp.starRating,
+          starLevel: typeof comp.starRating === "number" ? comp.starRating : null,
           createdById: actorId,
           updatedById: actorId,
         },
       });
     } else if (
       dbHotel.roomCount !== comp.roomCount ||
-      Number(dbHotel.starLevel ?? 0) !== Number(comp.starRating)
+      (typeof comp.starRating === "number" && Number(dbHotel.starLevel ?? 0) !== Number(comp.starRating)) ||
+      (typeof comp.starRating !== "number" && dbHotel.starLevel !== null)
     ) {
       dbHotel = await prisma.hotel.update({
         where: { id: dbHotel.id },
         data: {
           roomCount: comp.roomCount,
-          starLevel: comp.starRating,
+          starLevel: typeof comp.starRating === "number" ? comp.starRating : null,
           updatedById: actorId,
         },
       });

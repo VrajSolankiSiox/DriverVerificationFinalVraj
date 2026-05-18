@@ -161,7 +161,7 @@ export async function generatePptx(
     fontSize: 16,
     bold: true,
   });
-  comp.addText(`Subject hotel: ${viewModel.subjectHotel.name}`, {
+  comp.addText(`Main Property: ${viewModel.subjectHotel.name}`, {
     x: 7.5,
     y: 1.8,
     w: 4.6,

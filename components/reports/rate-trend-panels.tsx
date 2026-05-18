@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, startOfMonth, startOfWeek } from "date-fns";
+import { CalendarDays } from "lucide-react";
+import { DayPicker, type DateRange } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 
 import { HotelRateComparisonChart } from "@/components/reports/hotel-rate-comparison-chart";
 import { RatePositioningChart } from "@/components/reports/rate-positioning-chart";
@@ -144,6 +147,7 @@ function ChartCard({
   granularity,
   onGranularityChange,
   showGranularity = true,
+  headerAction,
   children,
 }: {
   title: string;
@@ -151,6 +155,7 @@ function ChartCard({
   granularity: Granularity;
   onGranularityChange: (value: Granularity) => void;
   showGranularity?: boolean;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -178,6 +183,8 @@ function ChartCard({
               <option value="MONTHLY">Monthly</option>
             </Select>
           </div>
+        ) : headerAction ? (
+          <div className="md:ml-4 md:shrink-0">{headerAction}</div>
         ) : null}
       </div>
       <div className="p-5 md:p-6">{children}</div>
@@ -189,31 +196,120 @@ export function RateTrendPanels({
   ratePositionData,
   hotelRateData,
   hotelRateLines,
+  mode = "full",
 }: {
   ratePositionData: RatePositionPoint[];
   hotelRateData: HotelRatePoint[];
   hotelRateLines: HotelLine[];
+  mode?: "full" | "hotel-only";
 }) {
   const [rateGranularity, setRateGranularity] = useState<Granularity>("DAILY");
-  const [selectedHotelDate, setSelectedHotelDate] = useState<string>(
-    hotelRateData[hotelRateData.length - 1]?.date
-      ? String(hotelRateData[hotelRateData.length - 1].date)
-      : "",
+  const allHotelDates = hotelRateData.map((row) => String(row.date));
+  const initialRangeStart = allHotelDates[0] ?? "";
+  const initialRangeEnd = allHotelDates[allHotelDates.length - 1] ?? "";
+  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(
+    initialRangeStart && initialRangeEnd
+      ? { from: new Date(`${initialRangeStart}T00:00:00`), to: new Date(`${initialRangeEnd}T00:00:00`) }
+      : undefined,
   );
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
 
   const visibleRatePositionData = aggregateRatePositionData(
     ratePositionData,
     rateGranularity,
   );
-  const availableHotelDates = hotelRateData.map((row) => String(row.date));
+  const rangeStartDate = selectedRange?.from
+    ? format(selectedRange.from, "yyyy-MM-dd")
+    : "";
+  const rangeEndDate = selectedRange?.to
+    ? format(selectedRange.to, "yyyy-MM-dd")
+    : "";
+
+  const filteredHotelRateData = hotelRateData.filter((row) => {
+    const date = String(row.date);
+    if (rangeStartDate && date < rangeStartDate) return false;
+    if (rangeEndDate && date > rangeEndDate) return false;
+    return true;
+  });
+  const availableHotelDates = filteredHotelRateData.map((row) => String(row.date));
   const fallbackDate =
     availableHotelDates[availableHotelDates.length - 1] ?? "";
-  const effectiveHotelDate = availableHotelDates.includes(selectedHotelDate)
-    ? selectedHotelDate
+  const effectiveHotelDate = availableHotelDates.includes(rangeEndDate)
+    ? rangeEndDate
     : fallbackDate;
   const selectedHotelPoint =
-    hotelRateData.find((row) => String(row.date) === effectiveHotelDate) ??
+    filteredHotelRateData.find((row) => String(row.date) === effectiveHotelDate) ??
     null;
+  const selectedRangeLabel =
+    rangeStartDate && rangeEndDate
+      ? `${format(new Date(`${rangeStartDate}T00:00:00`), "MM/dd/yy")} - ${format(new Date(`${rangeEndDate}T00:00:00`), "MM/dd/yy")}`
+      : "";
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!calendarRef.current) return;
+      if (!calendarRef.current.contains(event.target as Node)) {
+        setCalendarOpen(false);
+      }
+    }
+    if (calendarOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [calendarOpen]);
+
+  const hotelCard = (
+    <ChartCard
+        title="Hotel-by-Hotel Rate Comparison"
+        description="Pick a stay date from the calendar and compare each hotel's observed nightly rate in a bar chart."
+        granularity={"DAILY"}
+        onGranularityChange={() => {}}
+        showGranularity={false}
+        headerAction={
+          <div className="relative" ref={calendarRef}>
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((prev) => !prev)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-input bg-background shadow-sm"
+              aria-label="Open date range calendar"
+            >
+              <CalendarDays className="h-4 w-4" />
+            </button>
+            {calendarOpen ? (
+              <div className="absolute right-0 top-11 z-20 origin-top-right scale-90 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                <DayPicker
+                  mode="range"
+                  selected={selectedRange}
+                  onSelect={setSelectedRange}
+                  numberOfMonths={1}
+                  className="text-sm"
+                />
+              </div>
+            ) : null}
+          </div>
+        }
+      >
+        {hotelRateLines.length > 0 ? (
+          <HotelRateComparisonChart
+            selectedDate={effectiveHotelDate}
+            selectedRangeLabel={selectedRangeLabel}
+            point={selectedHotelPoint}
+            lines={hotelRateLines}
+          />
+        ) : (
+          <p className="text-sm text-slate-500">
+            No hotel-level comparison data is available for this report.
+          </p>
+        )}
+      </ChartCard>
+  );
+
+  if (mode === "hotel-only") {
+    return <div>{hotelCard}</div>;
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
@@ -225,41 +321,7 @@ export function RateTrendPanels({
       >
         <RatePositioningChart data={visibleRatePositionData} />
       </ChartCard>
-
-      <ChartCard
-        title="Hotel-by-Hotel Rate Comparison"
-        description="Pick a stay date from the calendar and compare each hotel's observed nightly rate in a bar chart."
-        granularity={"DAILY"}
-        onGranularityChange={() => {}}
-        showGranularity={false}
-      >
-        <div className="mb-4 max-w-[240px]">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Select Date
-          </label>
-          <input
-            type="date"
-            value={effectiveHotelDate}
-            min={availableHotelDates[0] ?? undefined}
-            max={
-              availableHotelDates[availableHotelDates.length - 1] ?? undefined
-            }
-            onChange={(event) => setSelectedHotelDate(event.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-        {hotelRateLines.length > 0 ? (
-          <HotelRateComparisonChart
-            selectedDate={effectiveHotelDate}
-            point={selectedHotelPoint}
-            lines={hotelRateLines}
-          />
-        ) : (
-          <p className="text-sm text-slate-500">
-            No hotel-level comparison data is available for this report.
-          </p>
-        )}
-      </ChartCard>
+      {hotelCard}
     </div>
   );
 }

@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         {
           error:
             summary.validationMessages?.[0] ??
-            "Subject hotel does not exist in the Excel file. Import has been blocked.",
+            "Main property does not exist in the Excel file. Import has been blocked.",
           summary,
         },
         { status: 400 },

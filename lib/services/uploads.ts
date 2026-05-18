@@ -1008,7 +1008,7 @@ export async function convertRateGridToValidation(
 
   const validationMessages: string[] = [];
   if (!subjectHotelObservedInFile) {
-    validationMessages.push(`Subject hotel "${batch.subjectHotel.name}" does not exist in the Excel file.`);
+    validationMessages.push(`Main property "${batch.subjectHotel.name}" does not exist in the Excel file.`);
   }
   if (missingCompSetHotelsInFile.length > 0) {
     validationMessages.push(

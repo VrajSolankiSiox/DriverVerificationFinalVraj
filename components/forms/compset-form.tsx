@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, type ReactNode } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -238,12 +238,8 @@ export function CompSetForm({
                 </td>
                 <td className="px-3 py-2 align-top">
                   <Input
-                    type="number"
-                    min={0}
-                    max={5}
-                    step={0.1}
-                    placeholder="4.3"
-                    {...form.register(`compHotels.${index}.starRating` as const, { valueAsNumber: true })}
+                    placeholder="4.3 or X"
+                    {...form.register(`compHotels.${index}.starRating` as const)}
                   />
                 </td>
                 <td className="px-3 py-2 align-top">

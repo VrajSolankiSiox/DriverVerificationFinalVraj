@@ -221,13 +221,13 @@ export default async function UploadBatchPage({
 
       <SectionCard
         title="Upload Context"
-        description="Subject property, compset scope, and file metadata that define the validation and import context."
+        description="Main property, compset scope, and file metadata that define the validation and import context."
       >
         <div className="space-y-5">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-md border border-sky-100 bg-white p-4 shadow-sm">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Subject Hotel
+                Main Property
               </p>
               <p className="mt-2 text-base font-semibold text-slate-950">
                 {batch.subjectHotel.name}
@@ -370,7 +370,7 @@ export default async function UploadBatchPage({
 
       <SectionCard
         title="Validation and Import"
-        description="Clear quality checks and import controls based on subject hotel match, compset completeness, and row-level validity."
+        description="Clear quality checks and import controls based on main property match, compset completeness, and row-level validity."
       >
         <div className="space-y-4 text-sm">
           <div className="grid gap-3 md:grid-cols-5">
@@ -419,10 +419,10 @@ export default async function UploadBatchPage({
           {subjectHotelMissingInFile ? (
             <Alert className="border-destructive/50 bg-destructive/5">
               <div className="text-sm font-medium text-destructive">
-                Import blocked: subject hotel is missing in the Excel file.
+                Import blocked: main property is missing in the Excel file.
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Expected subject hotel:{" "}
+                Expected main property:{" "}
                 <strong>{batch.subjectHotel.name}</strong>
               </div>
             </Alert>

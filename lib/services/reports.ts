@@ -327,6 +327,8 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
         name: member.hotel.name,
         roleType: member.roleType,
         otaRatings: parsedMetadata.otaRatings,
+        roomCount: member.hotel.roomCount,
+        starLevel: decimalToNumber(member.hotel.starLevel),
       };
       }),
     },
@@ -375,6 +377,8 @@ export async function buildReportViewModel(reportId: string): Promise<ReportView
           name: member.hotel.name,
           roleType: member.roleType,
           otaRatings: parsedMetadata.otaRatings,
+          roomCount: member.hotel.roomCount,
+          starLevel: decimalToNumber(member.hotel.starLevel),
         };
       }),
       reviewSnapshotsByHotel: Object.fromEntries(
@@ -410,7 +414,7 @@ export async function createReport(
 
   const compSet = await prisma.compSet.findUniqueOrThrow({ where: { id: parsed.compSetId } });
   if (compSet.subjectHotelId !== parsed.subjectHotelId) {
-    throw new Error("Selected compset does not belong to the chosen subject hotel.");
+    throw new Error("Selected compset does not belong to the chosen main property.");
   }
   const members = await prisma.compSetMember.findMany({
     where: { compSetId: parsed.compSetId },
@@ -461,7 +465,7 @@ export async function createReport(
     });
 
     if (uploadBatch.subjectHotelId !== parsed.subjectHotelId) {
-      throw new Error("Selected upload batch does not match the chosen subject hotel.");
+      throw new Error("Selected upload batch does not match the chosen main property.");
     }
     if (uploadBatch.compSetId !== parsed.compSetId) {
       throw new Error("Selected upload batch does not match the chosen compset.");
@@ -715,4 +719,30 @@ export async function updateReport(
 
 export async function approveReport(reportId: string, actorId: string, actorRole: UserRole) {
   return updateReport({ reportId, status: "APPROVED" }, actorId, actorRole);
+}
+
+export async function refreshReportsForCompSet(compSetId: string, actorId: string) {
+  const [compSet, reports] = await Promise.all([
+    prisma.compSet.findUniqueOrThrow({
+      where: { id: compSetId },
+      select: { version: true },
+    }),
+    prisma.report.findMany({
+      where: { compSetId },
+      select: { id: true },
+    }),
+  ]);
+
+  for (const report of reports) {
+    await prisma.report.update({
+      where: { id: report.id },
+      data: {
+        compSetVersion: compSet.version,
+        updatedById: actorId,
+      },
+    });
+    await refreshReport(report.id, actorId);
+  }
+
+  return reports.length;
 }

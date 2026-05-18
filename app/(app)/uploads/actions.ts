@@ -55,7 +55,7 @@ export async function convertRateGridAction(id: string, formData: FormData) {
     if (summary.subjectHotelObservedInFile === false) {
       revalidatePath(`/uploads/${id}`);
       console.error(
-        "Import blocked: subject hotel missing from Excel.",
+        "Import blocked: main property missing from Excel.",
         summary.validationMessages ?? [],
       );
       return;

@@ -16,7 +16,7 @@ function getHeaderCopy(pathname: string) {
   if (pathname === "/hotels/new") {
     return {
       title: "Create hotel",
-      subtitle: "Add the subject hotel or a comp property profile.",
+      subtitle: "Add the main property or a comp property profile.",
     };
   }
   if (/^\/hotels\/[^/]+\/edit$/.test(pathname)) {
@@ -40,7 +40,7 @@ function getHeaderCopy(pathname: string) {
   if (pathname === "/compsets/new") {
     return {
       title: "Create manual compset",
-      subtitle: "Subject property plus manually selected comp properties.",
+      subtitle: "Main property plus manually selected comp properties.",
     };
   }
   if (/^\/compsets\/[^/]+\/edit$/.test(pathname)) {
@@ -80,11 +80,24 @@ function getHeaderCopy(pathname: string) {
         "Analysis workspaces, approval flow, presentation mode, and exports.",
     };
   }
+  if (pathname === "/presentations") {
+    return {
+      title: "Presentations",
+      subtitle:
+        "Saved presentation versions with editable slide titles and report name.",
+    };
+  }
+  if (/^\/presentations\/[^/]+\/edit$/.test(pathname)) {
+    return {
+      title: "Edit presentation",
+      subtitle: "Customize titles with autosave and present when ready.",
+    };
+  }
   if (pathname === "/reports/new") {
     return {
       title: "Create report",
       subtitle:
-        "Choose a subject hotel and compset, then use imported data or enter rates manually.",
+        "Choose a main property and compset, then use imported data or enter rates manually.",
     };
   }
   if (/^\/reports\/[^/]+$/.test(pathname)) {

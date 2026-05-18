@@ -18,7 +18,11 @@ export const hotelSchema = z.object({
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
   roomCount: z.coerce.number().int().positive().optional().nullable(),
-  starLevel: z.coerce.number().min(1).max(5).optional().nullable(),
+  starLevel: z.union([
+    z.coerce.number().min(1).max(5),
+    z.literal("X"),
+    z.literal("x")
+  ]).optional().nullable(),
   ownershipNotes: z.string().optional().nullable(),
   managementNotes: z.string().optional().nullable(),
   reviewResponded: z.boolean().optional().default(false),

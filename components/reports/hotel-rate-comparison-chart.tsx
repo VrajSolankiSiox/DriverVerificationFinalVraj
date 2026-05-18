@@ -46,10 +46,12 @@ export function HotelRateComparisonChart({
   point,
   lines,
   selectedDate,
+  selectedRangeLabel,
 }: {
   point: ({ date: string } & Record<string, number | string | null>) | null;
   lines: LineDef[];
   selectedDate: string;
+  selectedRangeLabel?: string;
 }) {
   const chartData = lines
     .map((line) => ({
@@ -67,7 +69,7 @@ export function HotelRateComparisonChart({
       <div className="mb-3 text-sm text-slate-600">
         Showing rates for{" "}
         <span className="font-semibold text-slate-900">
-          {formatAxisLabel(selectedDate)}
+          {selectedRangeLabel || formatAxisLabel(selectedDate)}
         </span>
       </div>
       {chartData.length === 0 ? (
@@ -124,6 +126,28 @@ export function HotelRateComparisonChart({
                 radius={[0, 8, 8, 0]}
                 isAnimationActive={false}
               >
+                <LabelList
+                  dataKey="rate"
+                  position="insideRight"
+                  content={(props: any) => {
+                    if (props?.payload?.soldOut) return null;
+                    const value = typeof props?.value === "number" ? props.value : null;
+                    if (value === null) return null;
+                    return (
+                      <text
+                        x={(props.x ?? 0) + (props.width ?? 0) - 6}
+                        y={(props.y ?? 0) + (props.height ?? 0) / 2}
+                        fill="#ffffff"
+                        fontSize={11}
+                        fontWeight={700}
+                        textAnchor="end"
+                        dominantBaseline="middle"
+                      >
+                        {formatCurrency(value)}
+                      </text>
+                    );
+                  }}
+                />
                 <LabelList
                   dataKey="rate"
                   position="right"
