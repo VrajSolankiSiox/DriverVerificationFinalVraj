@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { AlertBanner } from "@/components/reports/alert-banner";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -20,6 +21,171 @@ import { formatDate } from "@/lib/utils";
 import { Building2, Network, AlertTriangle, FileBarChart, Database, Activity, PlayCircle, UploadCloud, MonitorPlay } from "lucide-react";
 import { format, subDays } from "date-fns";
 
+const getCachedDashboardData = unstable_cache(
+  async (dateFilter: string, activityFilter: string) => {
+    let gteDate: Date | undefined;
+    const now = new Date();
+    if (dateFilter === "weekly") {
+      gteDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    } else if (dateFilter === "monthly") {
+      gteDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    } else if (dateFilter === "yearly") {
+      gteDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    }
+
+    const dateCondition = gteDate ? { createdAt: { gte: gteDate } } : {};
+
+    // For Activity Chart
+    let activityGteDate: Date;
+    if (activityFilter === "monthly") {
+      activityGteDate = subDays(now, 180); // 6 months
+    } else if (activityFilter === "weekly") {
+      activityGteDate = subDays(now, 28); // 4 weeks
+    } else {
+      activityGteDate = subDays(now, 7); // 7 days
+    }
+
+    const [
+      hotelCount,
+      compsetHotelCount,
+      uploadFailures,
+      readyReports,
+      recentReports,
+      recentUploads,
+      alerts,
+      demoCount,
+      snapshotCount,
+      recentActivityReports,
+      recentActivityUploads,
+      recentActivityDemos,
+      recentDemosList,
+    ] = await Promise.all([
+      prisma.hotel.count({ where: { profileSource: "MANUAL", ...dateCondition } }),
+      prisma.compSetMember.count({ where: { roleType: "COMP", ...dateCondition } }),
+      prisma.uploadBatch.count({
+        where: { status: { in: ["FAILED", "PARTIAL_FAILED"] }, ...dateCondition },
+      }),
+      prisma.report.count({
+        where: { status: { in: ["REVIEW_READY", "APPROVED"] }, ...dateCondition },
+      }),
+      prisma.report.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        include: { subjectHotel: true },
+      }),
+      prisma.uploadBatch.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        include: { subjectHotel: true },
+      }),
+      getActiveAlerts(),
+      prisma.demoSession.count({ where: dateCondition }),
+      prisma.websiteSnapshot.count({ where: dateCondition }),
+      prisma.report.findMany({
+        where: { createdAt: { gte: activityGteDate } },
+        select: { createdAt: true },
+      }),
+      prisma.uploadBatch.findMany({
+        where: { createdAt: { gte: activityGteDate } },
+        select: { createdAt: true },
+      }),
+      prisma.demoSession.findMany({
+        where: { createdAt: { gte: activityGteDate } },
+        select: { createdAt: true },
+      }),
+      prisma.demoSession.findMany({
+        orderBy: [
+          { scheduledDate: 'asc' },
+          { createdAt: 'desc' }
+        ],
+        take: 6,
+      }),
+    ]);
+
+    const activityDataMap = new Map<string, { uploads: number; reports: number; demos: number }>();
+    
+    if (activityFilter === "monthly") {
+      for (let i = 5; i >= 0; i--) {
+        const d = format(new Date(now.getFullYear(), now.getMonth() - i, 1), "MMM yy");
+        activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
+      }
+      recentActivityReports.forEach(r => {
+        const d = format(r.createdAt, "MMM yy");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.reports++;
+      });
+      recentActivityUploads.forEach(u => {
+        const d = format(u.createdAt, "MMM yy");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.uploads++;
+      });
+      recentActivityDemos.forEach(demo => {
+        const d = format(demo.createdAt, "MMM yy");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.demos++;
+      });
+    } else if (activityFilter === "weekly") {
+      for (let i = 3; i >= 0; i--) {
+        const d = `Week ${4-i}`;
+        activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
+      }
+      const getWeekKey = (date: Date) => {
+        const diff = now.getTime() - date.getTime();
+        const weeksAgo = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+        if (weeksAgo >= 0 && weeksAgo < 4) return `Week ${4-weeksAgo}`;
+        return null;
+      };
+      recentActivityReports.forEach(r => {
+        const k = getWeekKey(r.createdAt);
+        if (k && activityDataMap.has(k)) activityDataMap.get(k)!.reports++;
+      });
+      recentActivityUploads.forEach(u => {
+        const k = getWeekKey(u.createdAt);
+        if (k && activityDataMap.has(k)) activityDataMap.get(k)!.uploads++;
+      });
+      recentActivityDemos.forEach(demo => {
+        const k = getWeekKey(demo.createdAt);
+        if (k && activityDataMap.has(k)) activityDataMap.get(k)!.demos++;
+      });
+    } else {
+      for (let i = 6; i >= 0; i--) {
+        const d = format(subDays(now, i), "MMM dd");
+        activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
+      }
+      recentActivityReports.forEach(r => {
+        const d = format(r.createdAt, "MMM dd");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.reports++;
+      });
+      recentActivityUploads.forEach(u => {
+        const d = format(u.createdAt, "MMM dd");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.uploads++;
+      });
+      recentActivityDemos.forEach(demo => {
+        const d = format(demo.createdAt, "MMM dd");
+        if (activityDataMap.has(d)) activityDataMap.get(d)!.demos++;
+      });
+    }
+
+    const chartData = Array.from(activityDataMap.entries()).map(([date, data]) => ({
+      date,
+      ...data
+    }));
+
+    return {
+      hotelCount,
+      compsetHotelCount,
+      uploadFailures,
+      readyReports,
+      recentReports,
+      recentUploads,
+      alerts,
+      demoCount,
+      snapshotCount,
+      recentDemosList,
+      chartData,
+    };
+  },
+  ["dashboard-metrics"],
+  { revalidate: 60 }
+);
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -28,29 +194,7 @@ export default async function DashboardPage({
   const { filter, activityFilter = "daily" } = await searchParams;
   const dateFilter = filter || "all";
 
-  let gteDate: Date | undefined;
-  const now = new Date();
-  if (dateFilter === "weekly") {
-    gteDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-  } else if (dateFilter === "monthly") {
-    gteDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-  } else if (dateFilter === "yearly") {
-    gteDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-  }
-
-  const dateCondition = gteDate ? { createdAt: { gte: gteDate } } : {};
-
-  // For Activity Chart
-  let activityGteDate: Date;
-  if (activityFilter === "monthly") {
-    activityGteDate = subDays(now, 180); // 6 months
-  } else if (activityFilter === "weekly") {
-    activityGteDate = subDays(now, 28); // 4 weeks
-  } else {
-    activityGteDate = subDays(now, 7); // 7 days
-  }
-
-  const [
+  const {
     hotelCount,
     compsetHotelCount,
     uploadFailures,
@@ -60,118 +204,9 @@ export default async function DashboardPage({
     alerts,
     demoCount,
     snapshotCount,
-    recentActivityReports,
-    recentActivityUploads,
-    recentActivityDemos,
     recentDemosList,
-  ] = await Promise.all([
-    prisma.hotel.count({ where: { profileSource: "MANUAL", ...dateCondition } }),
-    prisma.compSetMember.count({ where: { roleType: "COMP", ...dateCondition } }),
-    prisma.uploadBatch.count({
-      where: { status: { in: ["FAILED", "PARTIAL_FAILED"] }, ...dateCondition },
-    }),
-    prisma.report.count({
-      where: { status: { in: ["REVIEW_READY", "APPROVED"] }, ...dateCondition },
-    }),
-    prisma.report.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-      include: { subjectHotel: true },
-    }),
-    prisma.uploadBatch.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      include: { subjectHotel: true },
-    }),
-    getActiveAlerts(),
-    prisma.demoSession.count({ where: dateCondition }),
-    prisma.websiteSnapshot.count({ where: dateCondition }),
-    prisma.report.findMany({
-      where: { createdAt: { gte: activityGteDate } },
-      select: { createdAt: true },
-    }),
-    prisma.uploadBatch.findMany({
-      where: { createdAt: { gte: activityGteDate } },
-      select: { createdAt: true },
-    }),
-    prisma.demoSession.findMany({
-      where: { createdAt: { gte: activityGteDate } },
-      select: { createdAt: true },
-    }),
-    prisma.demoSession.findMany({
-      orderBy: [
-        { scheduledDate: 'asc' },
-        { createdAt: 'desc' }
-      ],
-      take: 6,
-    }),
-  ]);
-
-  const activityDataMap = new Map<string, { uploads: number; reports: number; demos: number }>();
-  
-  if (activityFilter === "monthly") {
-    for (let i = 5; i >= 0; i--) {
-      const d = format(new Date(now.getFullYear(), now.getMonth() - i, 1), "MMM yy");
-      activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
-    }
-    recentActivityReports.forEach(r => {
-      const d = format(r.createdAt, "MMM yy");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.reports++;
-    });
-    recentActivityUploads.forEach(u => {
-      const d = format(u.createdAt, "MMM yy");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.uploads++;
-    });
-    recentActivityDemos.forEach(demo => {
-      const d = format(demo.createdAt, "MMM yy");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.demos++;
-    });
-  } else if (activityFilter === "weekly") {
-    for (let i = 3; i >= 0; i--) {
-      const d = `Week ${4-i}`;
-      activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
-    }
-    const getWeekKey = (date: Date) => {
-      const diff = now.getTime() - date.getTime();
-      const weeksAgo = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
-      if (weeksAgo >= 0 && weeksAgo < 4) return `Week ${4-weeksAgo}`;
-      return null;
-    };
-    recentActivityReports.forEach(r => {
-      const k = getWeekKey(r.createdAt);
-      if (k && activityDataMap.has(k)) activityDataMap.get(k)!.reports++;
-    });
-    recentActivityUploads.forEach(u => {
-      const k = getWeekKey(u.createdAt);
-      if (k && activityDataMap.has(k)) activityDataMap.get(k)!.uploads++;
-    });
-    recentActivityDemos.forEach(demo => {
-      const k = getWeekKey(demo.createdAt);
-      if (k && activityDataMap.has(k)) activityDataMap.get(k)!.demos++;
-    });
-  } else {
-    for (let i = 6; i >= 0; i--) {
-      const d = format(subDays(now, i), "MMM dd");
-      activityDataMap.set(d, { uploads: 0, reports: 0, demos: 0 });
-    }
-    recentActivityReports.forEach(r => {
-      const d = format(r.createdAt, "MMM dd");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.reports++;
-    });
-    recentActivityUploads.forEach(u => {
-      const d = format(u.createdAt, "MMM dd");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.uploads++;
-    });
-    recentActivityDemos.forEach(demo => {
-      const d = format(demo.createdAt, "MMM dd");
-      if (activityDataMap.has(d)) activityDataMap.get(d)!.demos++;
-    });
-  }
-
-  const chartData = Array.from(activityDataMap.entries()).map(([date, data]) => ({
-    date,
-    ...data
-  }));
+    chartData,
+  } = await getCachedDashboardData(dateFilter, activityFilter);
 
   return (
     <Suspense fallback={<p>Loading dashboard...</p>}>
